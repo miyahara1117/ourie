@@ -111,20 +111,42 @@
       </button>
     </div>
 
-    <!-- 【オーバーレイ】着信画面 -->
-    <div id="call-overlay" class="hidden absolute inset-0 bg-black z-50 p-8 flex flex-col justify-between items-center text-center">
-      <div class="mt-12 space-y-4 w-full">
-        <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-[#7C3AED] to-[#6366F1] flex items-center justify-center mx-auto shadow-2xl shadow-indigo-500/30">
-          <i class="fa-solid fa-user text-4xl text-white"></i>
+    <!-- 【オーバーレイ】着信＆通話画面 -->
+    <div id="call-overlay" class="hidden absolute inset-0 bg-black z-50 p-6 flex flex-col justify-between items-center text-center">
+      <div class="mt-8 space-y-3 w-full">
+        <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-[#7C3AED] to-[#6366F1] flex items-center justify-center mx-auto shadow-2xl shadow-indigo-500/30">
+          <i class="fa-solid fa-user text-3xl text-white"></i>
         </div>
         <div>
-          <h3 id="call-sender-name" class="text-2xl font-bold text-white">過去の自分</h3>
+          <h3 id="call-sender-name" class="text-xl font-bold text-white">過去の自分</h3>
           <p id="call-status-text" class="text-xs text-[#A78BFA] mt-1 font-medium">未来からの着信...</p>
         </div>
       </div>
 
-      <div class="mb-12 flex justify-center items-center space-x-12 w-full">
-        <button type="button" onclick="endCall()" class="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/40">
+      <!-- 返答録音エリア（通話応答後に表示） -->
+      <div id="reply-area" class="hidden w-full max-w-xs bg-slate-900/90 border border-slate-700/80 rounded-2xl p-4 space-y-3 text-center my-auto">
+        <div class="flex items-center justify-center space-x-1.5 text-xs text-purple-300 font-bold">
+          <i class="fa-solid fa-reply text-xs"></i>
+          <span>過去の自分へ返答を録音</span>
+        </div>
+        <p id="reply-status" class="text-[11px] text-slate-400">マイクボタンを押して返答を吹き込む</p>
+        
+        <div class="flex justify-center items-center space-x-3">
+          <button id="reply-mic-btn" type="button" onclick="toggleReplyRecording()" 
+            class="w-12 h-12 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-md active:scale-95 transition-all">
+            <i id="reply-mic-icon" class="fa-solid fa-microphone text-base"></i>
+          </button>
+
+          <button id="reply-play-btn" type="button" onclick="playReplyPreview()" class="hidden px-3 py-2 bg-slate-800 text-purple-300 text-xs rounded-xl flex items-center space-x-1 border border-purple-500/30">
+            <i id="reply-play-icon" class="fa-solid fa-play text-xs"></i>
+            <span id="reply-play-text">確認</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 操作ボタン群 -->
+      <div class="mb-8 flex justify-center items-center space-x-12 w-full">
+        <button id="end-call-btn" type="button" onclick="endCall()" class="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/40">
           <i class="fa-solid fa-phone-slash text-2xl"></i>
         </button>
         <button id="accept-call-btn" type="button" onclick="acceptCall()" class="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40 animate-bounce">
@@ -140,6 +162,7 @@
     let recordedAudioBlob = null;
     let audioUrl = null;
     let audioPlayer = new Audio();
+    let replyPlayer = new Audio();
     let capsules = [];
     let callTimerInterval = null;
     let callSeconds = 0;
@@ -151,6 +174,13 @@
     let activeCallingCapsule = null;
     let ringtoneAudioCtx = null;
     let ringtoneOscillator = null;
+
+    // 返答録音用変数
+    let isReplyRecording = false;
+    let replyMediaRecorder = null;
+    let replyAudioChunks = [];
+    let replyAudioBlob = null;
+    let replyAudioUrl = null;
 
     window.onload = () => {
       const now = new Date();
@@ -294,7 +324,8 @@
         id: Date.now(),
         senderName: senderName,
         targetTime: targetTime,
-        audioUrl: audioUrl // 保存時に Blob URL を維持
+        audioUrl: audioUrl,
+        replyAudioUrl: null
       };
 
       capsules.push(capsule);
@@ -303,11 +334,9 @@
       if (delayMs > 0) {
         setTimeout(() => triggerIncomingCall(capsule), delayMs);
       } else {
-        // すでに過去の時間を指定した場合は3秒後に発信
         setTimeout(() => triggerIncomingCall(capsule), 3000);
       }
 
-      // UIのみ初期化し、audioUrlは保持（カプセルで利用中のため）
       document.getElementById('preview-btn').classList.add('hidden');
       document.getElementById('mic-status').innerText = "マイクボタンを押して録音開始";
       const btn = document.getElementById('submit-btn');
@@ -326,21 +355,42 @@
       }
 
       list.innerHTML = capsules.map(c => `
-        <div class="p-4 bg-[#1E293B] rounded-2xl border border-slate-700/60 flex items-center justify-between">
-          <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-full bg-[#4C1D95] flex items-center justify-center text-white">
-              <i class="fa-solid fa-phone-incoming text-sm"></i>
+        <div class="p-4 bg-[#1E293B] rounded-2xl border border-slate-700/60 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-full bg-[#4C1D95] flex items-center justify-center text-white">
+                <i class="fa-solid fa-phone-incoming text-sm"></i>
+              </div>
+              <div>
+                <p class="text-sm font-bold text-white">${c.senderName}</p>
+                <p class="text-xs text-slate-400">着信: ${c.targetTime.getFullYear()}/${c.targetTime.getMonth()+1}/${c.targetTime.getDate()} ${String(c.targetTime.getHours()).padStart(2,'0')}:${String(c.targetTime.getMinutes()).padStart(2,'0')}</p>
+              </div>
             </div>
-            <div>
-              <p class="text-sm font-bold text-white">${c.senderName}</p>
-              <p class="text-xs text-slate-400">着信予定: ${c.targetTime.getFullYear()}/${c.targetTime.getMonth()+1}/${c.targetTime.getDate()} ${String(c.targetTime.getHours()).padStart(2,'0')}:${String(c.targetTime.getMinutes()).padStart(2,'0')}</p>
-            </div>
+            <button type="button" onclick="deleteCapsule(${c.id})" class="text-slate-500 hover:text-red-400 p-2">
+              <i class="fa-regular fa-trash-can"></i>
+            </button>
           </div>
-          <button type="button" onclick="deleteCapsule(${c.id})" class="text-slate-500 hover:text-red-400 p-2">
-            <i class="fa-regular fa-trash-can"></i>
-          </button>
+
+          <div class="flex items-center space-x-2 pt-1 border-t border-slate-800">
+            <button type="button" onclick="playSavedAudio('${c.audioUrl}')" class="px-3 py-1.5 bg-[#4C1D95] text-white text-xs rounded-xl flex items-center space-x-1.5">
+              <i class="fa-solid fa-play text-[10px]"></i>
+              <span>メッセージ再生</span>
+            </button>
+            ${c.replyAudioUrl ? `
+              <button type="button" onclick="playSavedAudio('${c.replyAudioUrl}')" class="px-3 py-1.5 bg-emerald-700 text-white text-xs rounded-xl flex items-center space-x-1.5">
+                <i class="fa-solid fa-reply text-[10px]"></i>
+                <span>当時の返答を聞く</span>
+              </button>
+            ` : '<span class="text-[10px] text-slate-500">返答なし</span>'}
+          </div>
         </div>
       `).join('');
+    }
+
+    function playSavedAudio(url) {
+      if (!url) return;
+      audioPlayer.src = url;
+      audioPlayer.play().catch(e => console.warn(e));
     }
 
     function deleteCapsule(id) {
@@ -348,7 +398,7 @@
       renderCapsules();
     }
 
-    // --- 着信音の合成機能 ---
+    // --- 着信音合成 ---
     function startRingtone() {
       try {
         stopRingtone();
@@ -357,7 +407,7 @@
         const gainNode = ringtoneAudioCtx.createGain();
 
         ringtoneOscillator.type = 'sine';
-        ringtoneOscillator.frequency.setValueAtTime(400, ringtoneAudioCtx.currentTime); // 400Hz トゥルルル音
+        ringtoneOscillator.frequency.setValueAtTime(400, ringtoneAudioCtx.currentTime);
         gainNode.gain.setValueAtTime(0.1, ringtoneAudioCtx.currentTime);
 
         ringtoneOscillator.connect(gainNode);
@@ -382,9 +432,13 @@
     // --- 着信トリガー ---
     function triggerIncomingCall(capsule) {
       activeCallingCapsule = capsule;
+      replyAudioBlob = null;
+      replyAudioUrl = null;
+
       document.getElementById('call-sender-name').innerText = capsule.senderName;
       document.getElementById('call-status-text').innerText = "未来からの着信...";
       document.getElementById('accept-call-btn').classList.remove('hidden');
+      document.getElementById('reply-area').classList.add('hidden');
       document.getElementById('call-overlay').classList.remove('hidden');
 
       startRingtone();
@@ -395,6 +449,7 @@
       stopRingtone();
 
       document.getElementById('accept-call-btn').classList.add('hidden');
+      document.getElementById('reply-area').classList.remove('hidden');
       document.getElementById('call-status-text').innerText = "通話中: 00:00";
       callSeconds = 0;
       clearInterval(callTimerInterval);
@@ -411,14 +466,98 @@
         audioPlayer.src = activeCallingCapsule.audioUrl;
         audioPlayer.play().catch(e => {
           console.warn("Audio play error:", e);
-          alert("音声の再生に失敗しました。ブラウザの自動再生ブロックが影響している可能性があります。");
         });
 
         audioPlayer.onended = () => {
-          document.getElementById('call-status-text').innerText = "通話終了";
+          document.getElementById('call-status-text').innerText = "通話中 (返答録音可能)";
         };
+      }
+    }
+
+    // --- 返答録音機能 ---
+    async function toggleReplyRecording() {
+      const micBtn = document.getElementById('reply-mic-btn');
+      const micIcon = document.getElementById('reply-mic-icon');
+      const replyStatus = document.getElementById('reply-status');
+      const replyPlayBtn = document.getElementById('reply-play-btn');
+
+      if (!isReplyRecording) {
+        replyStatus.innerText = "マイク起動中...";
+        stopActiveStream();
+
+        try {
+          currentStream = await getAudioStream();
+          replyAudioChunks = [];
+
+          const options = MediaRecorder.isTypeSupported('audio/webm') 
+            ? { mimeType: 'audio/webm' } 
+            : (MediaRecorder.isTypeSupported('audio/mp4') ? { mimeType: 'audio/mp4' } : {});
+
+          replyMediaRecorder = new MediaRecorder(currentStream, options);
+
+          replyMediaRecorder.ondataavailable = event => {
+            if (event.data && event.data.size > 0) {
+              replyAudioChunks.push(event.data);
+            }
+          };
+
+          replyMediaRecorder.onstop = () => {
+            const mimeType = replyMediaRecorder.mimeType || 'audio/mp4';
+            replyAudioBlob = new Blob(replyAudioChunks, { type: mimeType });
+            replyAudioUrl = URL.createObjectURL(replyAudioBlob);
+            
+            if (activeCallingCapsule) {
+              activeCallingCapsule.replyAudioUrl = replyAudioUrl;
+              renderCapsules();
+            }
+
+            replyPlayBtn.classList.remove('hidden');
+            replyStatus.innerText = "返答を記録しました！";
+            stopActiveStream();
+          };
+
+          replyMediaRecorder.start(100);
+          isReplyRecording = true;
+          micBtn.className = "w-12 h-12 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md pulse-animation cursor-pointer";
+          micIcon.className = "fa-solid fa-square text-base";
+          replyStatus.innerText = "返答を録音中... タップで停止";
+        } catch (err) {
+          console.error("返答録音エラー:", err);
+          isReplyRecording = false;
+          stopActiveStream();
+          replyStatus.innerText = "マイクの起動に失敗しました";
+        }
       } else {
-        alert("再生可能な音声データが見つかりませんでした。");
+        try {
+          if (replyMediaRecorder && replyMediaRecorder.state !== "inactive") {
+            replyMediaRecorder.stop();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+        isReplyRecording = false;
+        micBtn.className = "w-12 h-12 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-md cursor-pointer";
+        micIcon.className = "fa-solid fa-microphone text-base";
+      }
+    }
+
+    function playReplyPreview() {
+      const icon = document.getElementById('reply-play-icon');
+      const text = document.getElementById('reply-play-text');
+
+      if (!replyPlayer.paused) {
+        replyPlayer.pause();
+        icon.className = "fa-solid fa-play text-xs";
+        text.innerText = "確認";
+      } else if (replyAudioUrl) {
+        replyPlayer.src = replyAudioUrl;
+        replyPlayer.play().catch(e => console.warn(e));
+        icon.className = "fa-solid fa-pause text-xs";
+        text.innerText = "停止";
+        replyPlayer.onended = () => {
+          icon.className = "fa-solid fa-play text-xs";
+          text.innerText = "確認";
+        };
       }
     }
 
@@ -427,6 +566,13 @@
       stopRingtone();
       clearInterval(callTimerInterval);
       audioPlayer.pause();
+      replyPlayer.pause();
+      
+      if (isReplyRecording && replyMediaRecorder) {
+        try { replyMediaRecorder.stop(); } catch(e){}
+      }
+      stopActiveStream();
+
       document.getElementById('call-overlay').classList.add('hidden');
       activeCallingCapsule = null;
     }
