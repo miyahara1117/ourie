@@ -2,62 +2,28 @@ name: Build Android APK
 
 on:
 push:
-branches: [ main ]
+branches:
+- main
 workflow_dispatch:
 
 jobs:
 build:
 runs-on: ubuntu-latest
 steps:
-- name: Checkout repository
-uses: actions/checkout@v4
-
-  - name: Setup Node.js
-    uses: actions/setup-node@v4
-    with:
-      node-version: '20'
-
-  - name: Setup Java JDK
-    uses: actions/setup-java@v4
-    with:
-      distribution: 'zulu'
-      java-version: '17'
-
-  - name: Setup Android SDK
-    uses: android-actions/setup-android@v3
-
-  - name: Install dependencies
-    run: npm install
-
-  - name: Add Android platform and sync
-    run: |
-      npx cap add android || true
-      npx cap sync android
-
-  - name: Inject microphone permissions
-    run: |
-      python3 -c "
-      import os
-      manifest_path = 'android/app/src/main/AndroidManifest.xml'
-      if os.path.exists(manifest_path):
-          with open(manifest_path, 'r', encoding='utf-8') as f:
-              content = f.read()
-          perms = '\n    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />\n    <uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\" />\n    <uses-feature android:name=\"android.hardware.microphone\" android:required=\"true\" />\n'
-          if 'RECORD_AUDIO' not in content:
-              content = content.replace('</manifest>', perms + '</manifest>')
-              with open(manifest_path, 'w', encoding='utf-8') as f:
-                  f.write(content)
-              print('Manifest permissions successfully added.')
-      "
-
-  - name: Build Debug APK
-    working-directory: android
-    run: |
-      chmod +x gradlew
-      ./gradlew assembleDebug
-
-  - name: Upload APK Artifact
-    uses: actions/upload-artifact@v4
-    with:
-      name: Ourie-App-APK
-      path: android/app/build/outputs/apk/debug/app-debug.apk
+- uses: actions/checkout@v4
+- uses: actions/setup-node@v4
+with:
+node-version: '20'
+- uses: actions/setup-java@v4
+with:
+distribution: 'zulu'
+java-version: '17'
+- uses: android-actions/setup-android@v3
+- run: npm install
+- run: npx cap add android || true
+- run: npx cap sync android
+- run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+- uses: actions/upload-artifact@v4
+with:
+name: Ourie-App-APK
+path: android/app/build/outputs/apk/debug/app-debug.apk
