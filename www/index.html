@@ -8,8 +8,8 @@
   <link rel="icon" id="app-favicon" href="icon.png" type="image/png">
   <link rel="apple-touch-icon" href="icon.png">
   <!-- Chosen Palette: Slate & Purple Night Theme -->
-  <!-- Application Structure Plan: Single-page interactive phone app for scheduling and receiving voice time capsules with default earpiece routing, speaker mode toggles, and custom image app icon integration. -->
-  <!-- Visualization & Content Choices: Tailwind responsive UI, FontAwesome icons, native audio routing (Earpiece default + Speaker toggle), dynamic icon state updates. CONFIRMING: NO SVG, NO Mermaid JS. -->
+  <!-- Application Structure Plan: Single-page interactive phone time-capsule app ensuring all playback modes (record preview, capsule history, in-call incoming message, reply) route to Earpiece by default using Web Audio API decoding and native audio toggles, while allowing user override to Loudspeaker via a global switch. -->
+  <!-- Visualization & Content Choices: Tailwind responsive UI, FontAwesome icons, Web Audio API + AudioToggle routing (Earpiece default + Loudspeaker toggle). CONFIRMING: NO SVG, NO Mermaid JS. -->
   <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -76,7 +76,7 @@
             </div>
           </div>
           <p class="text-[11px] text-slate-300 leading-relaxed">
-            メッセージの確認・再生時は耳をスマホ上部に当ててお聴きいただけます。右上のボタンで本体スピーカーに切替も可能です。
+            録音直後の確認やメッセージ再生時は、耳をスマホ上部に当てて通話感覚でお聴きいただけます。右上のボタンで本体スピーカーへ切替可能です。
           </p>
         </div>
 
@@ -100,7 +100,7 @@
 
           <button id="preview-btn" type="button" onclick="playPreview()" class="hidden mx-auto px-4 py-2 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-2 border border-purple-400/30 transition-all">
             <i id="preview-icon" class="fa-solid fa-phone-volume text-sm text-purple-200"></i>
-            <span id="preview-text">受話器でメッセージを確認</span>
+            <span id="preview-text">通話スピーカーで録音を確認</span>
           </button>
         </div>
 
@@ -207,8 +207,6 @@
     let isRecording = false;
     let recordedAudioBlob = null;
     let audioUrl = null;
-    let audioPlayer = new Audio();
-    let replyPlayer = new Audio();
     let capsules = [];
     let callTimerInterval = null;
     let callSeconds = 0;
@@ -229,6 +227,12 @@
     // Default Audio Mode: EARPIECE (通話受話器 / 耳あて)
     let isSpeakerMode = false;
 
+    // Dynamic Audio Routing Control via Web Audio API & Native Bridge
+    let activeAudioCtx = null;
+    let activeAudioSource = null;
+    let currentPlayingUrl = null;
+    let currentOnEndedHandler = null;
+
     window.onload = () => {
       const now = new Date();
       now.setMinutes(now.getMinutes() + 1);
@@ -243,10 +247,7 @@
       isSpeakerMode = !isSpeakerMode;
       updateSpeakerUI();
 
-      if (audioPlayer && !audioPlayer.paused) {
-        applyCurrentAudioRoute();
-      }
-      if (replyPlayer && !replyPlayer.paused) {
+      if (currentPlayingUrl) {
         applyCurrentAudioRoute();
       }
     }
@@ -291,7 +292,10 @@
             window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE);
             setTimeout(() => {
               try { window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE); } catch(e){}
-            }, 150);
+            }, 100);
+            setTimeout(() => {
+              try { window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE); } catch(e){}
+            }, 300);
           } else if (mode === 'SPEAKER') {
             window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
           } else {
@@ -301,6 +305,80 @@
           console.warn("AudioToggle plugin error:", e);
         }
       }
+    }
+
+    function stopCurrentAudio() {
+      if (activeAudioSource) {
+        try { activeAudioSource.stop(); } catch(e){}
+        activeAudioSource = null;
+      }
+      if (activeAudioCtx) {
+        try { activeAudioCtx.close(); } catch(e){}
+        activeAudioCtx = null;
+      }
+      currentPlayingUrl = null;
+      setNativeAudioMode('NORMAL');
+
+      if (currentOnEndedHandler) {
+        const handler = currentOnEndedHandler;
+        currentOnEndedHandler = null;
+        handler();
+      }
+    }
+
+    async function playAudioWithEarpieceRouting(url, onEnded) {
+      if (currentPlayingUrl === url) {
+        stopCurrentAudio();
+        return;
+      }
+
+      stopCurrentAudio();
+      currentPlayingUrl = url;
+      currentOnEndedHandler = onEnded;
+
+      applyCurrentAudioRoute();
+
+      try {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+
+        activeAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const decodedData = await activeAudioCtx.decodeAudioData(arrayBuffer);
+
+        activeAudioSource = activeAudioCtx.createBufferSource();
+        activeAudioSource.buffer = decodedData;
+
+        activeAudioSource.connect(activeAudioCtx.destination);
+
+        applyCurrentAudioRoute();
+
+        activeAudioSource.onended = () => {
+          stopCurrentAudio();
+        };
+
+        activeAudioSource.start(0);
+
+        setTimeout(() => applyCurrentAudioRoute(), 100);
+        setTimeout(() => applyCurrentAudioRoute(), 250);
+
+      } catch (err) {
+        console.warn("Web Audio API routing fallback:", err);
+        fallbackAudioPlay(url, onEnded);
+      }
+    }
+
+    function fallbackAudioPlay(url, onEnded) {
+      const fallbackAudio = new Audio(url);
+      applyCurrentAudioRoute();
+      fallbackAudio.play().then(() => {
+        applyCurrentAudioRoute();
+      }).catch(e => console.warn(e));
+
+      fallbackAudio.onended = () => {
+        currentPlayingUrl = null;
+        setNativeAudioMode('NORMAL');
+        if (onEnded) onEnded();
+      };
     }
 
     function stopActiveStream() {
@@ -341,6 +419,8 @@
       const micIcon = document.getElementById('mic-icon');
       const micStatus = document.getElementById('mic-status');
       const previewBtn = document.getElementById('preview-btn');
+
+      stopCurrentAudio();
 
       if (!isRecording) {
         micStatus.innerText = "マイクを起動中...";
@@ -421,29 +501,23 @@
       const previewText = document.getElementById('preview-text');
       const previewBtn = document.getElementById('preview-btn');
 
-      if (!audioPlayer.paused) {
-        audioPlayer.pause();
-        previewIcon.className = "fa-solid fa-phone-volume text-sm text-purple-200";
-        previewText.innerText = "受話器でメッセージを確認";
-        previewBtn.classList.remove('playing-glow');
-        setNativeAudioMode('NORMAL');
-      } else if (audioUrl) {
-        applyCurrentAudioRoute();
-        audioPlayer.src = audioUrl;
-        audioPlayer.play().then(() => {
-          applyCurrentAudioRoute();
-        }).catch(e => console.warn(e));
+      if (!audioUrl) return;
 
+      if (currentPlayingUrl === audioUrl) {
+        stopCurrentAudio();
+        previewIcon.className = "fa-solid fa-phone-volume text-sm text-purple-200";
+        previewText.innerText = "通話スピーカーで録音を確認";
+        previewBtn.classList.remove('playing-glow');
+      } else {
         previewIcon.className = "fa-solid fa-pause text-sm text-red-300";
-        previewText.innerText = isSpeakerMode ? "スピーカーから再生中 (停止)" : "受話器から再生中 (停止)";
+        previewText.innerText = isSpeakerMode ? "スピーカー再生中 (タップで停止)" : "耳あてで再生中 (タップで停止)";
         previewBtn.classList.add('playing-glow');
 
-        audioPlayer.onended = () => {
+        playAudioWithEarpieceRouting(audioUrl, () => {
           previewIcon.className = "fa-solid fa-phone-volume text-sm text-purple-200";
-          previewText.innerText = "受話器でメッセージを確認";
+          previewText.innerText = "通話スピーカーで録音を確認";
           previewBtn.classList.remove('playing-glow');
-          setNativeAudioMode('NORMAL');
-        };
+        });
       }
     }
 
@@ -541,28 +615,20 @@
 
       const icon = btnElement.querySelector('i');
 
-      if (audioPlayer.src === url && !audioPlayer.paused) {
-        audioPlayer.pause();
-        setNativeAudioMode('NORMAL');
+      if (currentPlayingUrl === url) {
+        stopCurrentAudio();
         if (icon) icon.className = "fa-solid fa-phone-volume text-[10px]";
         btnElement.classList.remove('playing-glow');
         return;
       }
 
-      applyCurrentAudioRoute();
-      audioPlayer.src = url;
-      audioPlayer.play().then(() => {
-        applyCurrentAudioRoute();
-      }).catch(e => console.warn(e));
-
       if (icon) icon.className = "fa-solid fa-pause text-[10px]";
       btnElement.classList.add('playing-glow');
 
-      audioPlayer.onended = () => {
-        setNativeAudioMode('NORMAL');
+      playAudioWithEarpieceRouting(url, () => {
         if (icon) icon.className = "fa-solid fa-phone-volume text-[10px]";
         btnElement.classList.remove('playing-glow');
-      };
+      });
     }
 
     function deleteCapsule(id) {
@@ -619,8 +685,6 @@
     function acceptCall() {
       stopRingtone();
 
-      applyCurrentAudioRoute();
-
       document.getElementById('accept-call-btn').classList.add('hidden');
       document.getElementById('reply-area').classList.remove('hidden');
       document.getElementById('speaker-toggle-container').classList.remove('hidden');
@@ -636,16 +700,9 @@
       }, 1000);
 
       if (activeCallingCapsule && activeCallingCapsule.audioUrl) {
-        audioPlayer.src = activeCallingCapsule.audioUrl;
-        audioPlayer.play().then(() => {
-          applyCurrentAudioRoute();
-        }).catch(e => {
-          console.warn("Audio play error:", e);
-        });
-
-        audioPlayer.onended = () => {
+        playAudioWithEarpieceRouting(activeCallingCapsule.audioUrl, () => {
           document.getElementById('call-status-text').innerText = "通話中 (返答録音可能)";
-        };
+        });
       }
     }
 
@@ -654,6 +711,8 @@
       const micIcon = document.getElementById('reply-mic-icon');
       const replyStatus = document.getElementById('reply-status');
       const replyPlayBtn = document.getElementById('reply-play-btn');
+
+      stopCurrentAudio();
 
       if (!isReplyRecording) {
         replyStatus.innerText = "マイク起動中...";
@@ -724,33 +783,27 @@
       const icon = document.getElementById('reply-play-icon');
       const text = document.getElementById('reply-play-text');
 
-      if (!replyPlayer.paused) {
-        replyPlayer.pause();
+      if (!replyAudioUrl) return;
+
+      if (currentPlayingUrl === replyAudioUrl) {
+        stopCurrentAudio();
         icon.className = "fa-solid fa-play text-xs";
         text.innerText = "返答を確認";
-        setNativeAudioMode('NORMAL');
-      } else if (replyAudioUrl) {
-        applyCurrentAudioRoute();
-        replyPlayer.src = replyAudioUrl;
-        replyPlayer.play().then(() => {
-          applyCurrentAudioRoute();
-        }).catch(e => console.warn(e));
-
+      } else {
         icon.className = "fa-solid fa-pause text-xs";
         text.innerText = "再生中 (停止)";
-        replyPlayer.onended = () => {
+
+        playAudioWithEarpieceRouting(replyAudioUrl, () => {
           icon.className = "fa-solid fa-play text-xs";
           text.innerText = "返答を確認";
-          setNativeAudioMode('NORMAL');
-        };
+        });
       }
     }
 
     function endCall() {
       stopRingtone();
       clearInterval(callTimerInterval);
-      audioPlayer.pause();
-      replyPlayer.pause();
+      stopCurrentAudio();
       
       if (isReplyRecording && replyMediaRecorder) {
         try { replyMediaRecorder.stop(); } catch(e){}
