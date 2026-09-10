@@ -1,51 +1,73 @@
 name: Build Android APK
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+push:
+branches: [ main ]
+workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: コードチェックアウト
-        uses: actions/checkout@v4
+build:
+runs-on: ubuntu-latest
+steps:
+- name: コードチェックアウト
+uses: actions/checkout@v4
 
-      - name: Node.js セットアップ
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+  - name: Node.js セットアップ
+    uses: actions/setup-node@v4
+    with:
+      node-version: 20
 
-      - name: Java (JDK 17) セットアップ
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
+  - name: Java (JDK 17) セットアップ
+    uses: actions/setup-java@v4
+    with:
+      distribution: 'zulu'
+      java-version: '17'
 
-      - name: Android SDK セットアップ
-        uses: android-actions/setup-android@v3
+  - name: Android SDK セットアップ
+    uses: android-actions/setup-android@v3
 
-      - name: 依存関係のインストール & プラットフォーム追加
-        run: |
-          npm install
-          npx cap add android
+  - name: 依存関係のインストール & プラットフォーム追加
+    run: |
+      npm install
+      npx cap add android
 
-      - name: AndroidManifestにマイク・音声設定権限を自動追加
-        run: |
-          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' android/app/src/main/AndroidManifest.xml
+  - name: AndroidManifestにマイク・音声権限を追加
+    run: |
+      sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-feature android:name="android.hardware.microphone" android:required="true" />' android/app/src/main/AndroidManifest.xml
 
-      - name: Webアセット同期
-        run: npx cap sync android
+  - name: MainActivityにアプリ起動時のマイク権限ダイアログ表示コードを自動注入
+    run: |
+      cat << 'EOF' > android/app/src/main/java/com/ourie/timecapsule/MainActivity.java
+      package com.ourie.timecapsule;
 
-      - name: APKビルド
-        working-directory: android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
+      import android.os.Bundle;
+      import android.Manifest;
+      import androidx.core.app.ActivityCompat;
+      import com.getcapacitor.BridgeActivity;
 
-      - name: 完成したAPKの保存
-        uses: actions/upload-artifact@v4
-        with:
-          name: Ourie-App-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+      public class MainActivity extends BridgeActivity {
+          @Override
+          public void onCreate(Bundle savedInstanceState) {
+              super.onCreate(savedInstanceState);
+              ActivityCompat.requestPermissions(this, new String[]{
+                  Manifest.permission.RECORD_AUDIO,
+                  Manifest.permission.MODIFY_AUDIO_SETTINGS
+              }, 101);
+          }
+      }
+      EOF
+
+  - name: Webアセット同期
+    run: npx cap sync android
+
+  - name: APKビルド
+    working-directory: android
+    run: |
+      chmod +x gradlew
+      ./gradlew assembleDebug
+
+  - name: 完成したAPKの保存
+    uses: actions/upload-artifact@v4
+    with:
+      name: Ourie-App-APK
+      path: android/app/build/outputs/apk/debug/app-debug.apk
