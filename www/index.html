@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ourie</title>
+  <!-- Chosen Palette: Slate & Purple Night Theme -->
+  <!-- Application Structure Plan: Single-page application simulating an incoming voice call time-capsule service ("Ourie") with options for recording future messages, receiving scheduled calls, recording immediate replies, and switching audio routing between earpiece and speaker mode for authentic telephone interaction. -->
+  <!-- Visualization & Content Choices: Clean Tailwind layout with HTML/CSS interactive elements, audio player handling, and modal phone UI. CONFIRMING: NO SVG, NO Mermaid JS. -->
+  <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -121,6 +125,15 @@
           <h3 id="call-sender-name" class="text-xl font-bold text-white">過去の自分</h3>
           <p id="call-status-text" class="text-xs text-[#A78BFA] mt-1 font-medium">未来からの着信...</p>
         </div>
+
+        <!-- スピーカー切替ボタン（通話中のみ表示） -->
+        <div id="speaker-toggle-container" class="hidden pt-2">
+          <button id="speaker-toggle-btn" type="button" onclick="toggleSpeakerOutput()" 
+            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 text-xs rounded-full border border-purple-500/30 inline-flex items-center space-x-2">
+            <i id="speaker-toggle-icon" class="fa-solid fa-[#fa-ear-listen]"></i>
+            <span id="speaker-toggle-text">耳あて受話器モード</span>
+          </button>
+        </div>
       </div>
 
       <!-- 返答録音エリア（通話応答後に表示） -->
@@ -181,6 +194,9 @@
     let replyAudioChunks = [];
     let replyAudioBlob = null;
     let replyAudioUrl = null;
+
+    // スピーカー状態 (true: 本体スピーカー, false: 耳あて受話器)
+    let isLoudspeaker = false;
 
     window.onload = () => {
       const now = new Date();
@@ -439,9 +455,36 @@
       document.getElementById('call-status-text').innerText = "未来からの着信...";
       document.getElementById('accept-call-btn').classList.remove('hidden');
       document.getElementById('reply-area').classList.add('hidden');
+      document.getElementById('speaker-toggle-container').classList.add('hidden');
       document.getElementById('call-overlay').classList.remove('hidden');
 
       startRingtone();
+    }
+
+    // --- 音声出力（耳あて/スピーカー）制御 ---
+    async function toggleSpeakerOutput() {
+      isLoudspeaker = !isLoudspeaker;
+      const text = document.getElementById('speaker-toggle-text');
+
+      if (isLoudspeaker) {
+        text.innerText = "本体スピーカーモード";
+      } else {
+        text.innerText = "耳あて受話器モード";
+      }
+
+      // Web API (setSinkId) でデバイスの切り替えを試行
+      if (typeof audioPlayer.setSinkId === 'function') {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+          const target = audioOutputs.find(d => isLoudspeaker ? d.label.includes('speaker') : d.label.includes('earpiece') || d.label.includes('telephony'));
+          if (target) {
+            await audioPlayer.setSinkId(target.deviceId);
+          }
+        } catch(e) {
+          console.warn("setSinkId switch error:", e);
+        }
+      }
     }
 
     // --- 通話応答 ---
@@ -450,6 +493,7 @@
 
       document.getElementById('accept-call-btn').classList.add('hidden');
       document.getElementById('reply-area').classList.remove('hidden');
+      document.getElementById('speaker-toggle-container').classList.remove('hidden');
       document.getElementById('call-status-text').innerText = "通話中: 00:00";
       callSeconds = 0;
       clearInterval(callTimerInterval);
