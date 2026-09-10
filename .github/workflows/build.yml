@@ -9,37 +9,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
           java-version: '17'
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: '18'
 
-      - name: Install Capacitor & Dependencies
-        run: |
-          npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+      - name: Install Cordova
+        run: npm install -g cordova
 
-      - name: Initialize Capacitor Project
+      - name: Create Cordova Project
         run: |
-          npx cap init Ourie com.ourie.app --web-dir www
-          npx cap add android
+          cordova create build_app com.ourie.app Ourie
+          rm -rf build_app/www
+          cp -r www build_app/www
+          sed -i '/<\/widget>/i \    <icon src="www/icon.png" />' build_app/config.xml
 
-      - name: Build Android App with Gradle
+      - name: Add Android Platform & Plugins
         run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          cd build_app
+          cordova platform add android
+          # Pixel 7 Pro向けにマイク・録音権限をCordova公式プラグインで自動付与
+          cordova plugin add cordova-plugin-android-permissions
+
+      - name: Build APK
+        run: |
+          cd build_app
+          cordova build android --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug.apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk－
+          name: app-debug
+          path: build_app/platforms/android/app/build/outputs/apk/debug/app-debug.apk
