@@ -1,11 +1,10 @@
-name: Build Android APK
-
-on:push:
-on: push:branches:- mainworkflow_dispatch:
-
-jobs:build:runs-on: ubuntu-latest
-
-steps:
+name: Build Android APKon:
+push:
+branches:
+- main
+workflow_dispatch:jobs:
+build:
+runs-on: ubuntu-lateststeps:
   - name: Checkout repository
     uses: actions/checkout@v4
 
