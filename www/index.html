@@ -76,7 +76,7 @@
           </button>
         </div>
 
-        <!-- 日時指定 (直接ピッカー指定) -->
+        <!-- 日時指定 -->
         <div class="space-y-1.5">
           <label class="text-xs text-slate-300">お届け日時を指定（未来の着信日時）</label>
           <input id="datetime-input" type="datetime-local" 
@@ -147,6 +147,11 @@
     let audioChunks = [];
     let currentStream = null;
 
+    // 着信管理用変数
+    let activeCallingCapsule = null;
+    let ringtoneAudioCtx = null;
+    let ringtoneOscillator = null;
+
     window.onload = () => {
       const now = new Date();
       now.setMinutes(now.getMinutes() + 1);
@@ -156,7 +161,6 @@
       renderCapsules();
     };
 
-    // 音声ストリームの安全な解放関数
     function stopActiveStream() {
       if (currentStream) {
         try {
@@ -168,20 +172,16 @@
       }
     }
 
-    // マイクの取得（端末ドライバとの衝突を避けるフォールバック処理付き）
     async function getAudioStream() {
-      // 1. まず最もシンプルな権限要求を試す（最も互換性が高い）
       try {
         return await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch (err) {
-        // 2. 失敗した場合は特定のオプションを試行
         return await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: false, noiseSuppression: false }
         });
       }
     }
 
-    // 録音の開始・停止処理
     async function startOrStopRecording() {
       const micBtn = document.getElementById('mic-btn');
       const micIcon = document.getElementById('mic-icon');
@@ -200,7 +200,6 @@
         stopActiveStream();
 
         try {
-          // マイクストリームを取得
           currentStream = await getAudioStream();
           audioChunks = [];
 
@@ -238,16 +237,8 @@
           micBtn.className = "w-20 h-20 rounded-full bg-[#7C3AED] text-white flex items-center justify-center mx-auto shadow-lg shadow-[#7C3AED]/40 active:scale-95 cursor-pointer";
           micIcon.className = "fa-solid fa-microphone text-2xl";
 
-          if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-            micStatus.innerText = "マイク権限がOFFになっています";
-            alert("スマホの「設定」>「アプリ」>「Ourie」>「権限」からマイクを「許可」に設定してください。");
-          } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-            micStatus.innerText = "マイクの初期化に失敗しました";
-            alert("【マイク起動エラー】\n1. スマホの「設定」>「アプリ」>「Ourie」>「権限」でマイクが許可されているかご確認ください。\n2. スマホを再起動してから再度お試しください。");
-          } else {
-            micStatus.innerText = "エラー: " + (err.name || "マイクを開けません");
-            alert("マイクの起動に失敗しました: " + (err.message || err.name));
-          }
+          micStatus.innerText = "エラー: " + (err.name || "マイクを開けません");
+          alert("マイクの起動に失敗しました: " + (err.message || err.name));
         }
       } else {
         try {
@@ -294,7 +285,7 @@
     function saveCapsule() {
       const senderName = document.getElementById('sender-input').value.trim() || '過去の自分';
       const targetTimeVal = document.getElementById('datetime-input').value;
-      if (!targetTimeVal) return;
+      if (!targetTimeVal || !audioUrl) return;
 
       const targetTime = new Date(targetTimeVal);
       const delayMs = targetTime.getTime() - Date.now();
@@ -303,7 +294,7 @@
         id: Date.now(),
         senderName: senderName,
         targetTime: targetTime,
-        audioUrl: audioUrl
+        audioUrl: audioUrl // 保存時に Blob URL を維持
       };
 
       capsules.push(capsule);
@@ -311,14 +302,19 @@
 
       if (delayMs > 0) {
         setTimeout(() => triggerIncomingCall(capsule), delayMs);
+      } else {
+        // すでに過去の時間を指定した場合は3秒後に発信
+        setTimeout(() => triggerIncomingCall(capsule), 3000);
       }
 
-      audioUrl = null;
+      // UIのみ初期化し、audioUrlは保持（カプセルで利用中のため）
       document.getElementById('preview-btn').classList.add('hidden');
       document.getElementById('mic-status').innerText = "マイクボタンを押して録音開始";
       const btn = document.getElementById('submit-btn');
       btn.disabled = true;
       btn.className = "w-full py-3.5 bg-slate-800 text-slate-500 font-bold text-sm rounded-2xl flex items-center justify-center space-x-2 transition-all";
+      
+      alert("タイムカプセルをセットしました！指定日時になると着信します。");
     }
 
     function renderCapsules() {
@@ -352,17 +348,57 @@
       renderCapsules();
     }
 
+    // --- 着信音の合成機能 ---
+    function startRingtone() {
+      try {
+        stopRingtone();
+        ringtoneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        ringtoneOscillator = ringtoneAudioCtx.createOscillator();
+        const gainNode = ringtoneAudioCtx.createGain();
+
+        ringtoneOscillator.type = 'sine';
+        ringtoneOscillator.frequency.setValueAtTime(400, ringtoneAudioCtx.currentTime); // 400Hz トゥルルル音
+        gainNode.gain.setValueAtTime(0.1, ringtoneAudioCtx.currentTime);
+
+        ringtoneOscillator.connect(gainNode);
+        gainNode.connect(ringtoneAudioCtx.destination);
+        ringtoneOscillator.start();
+      } catch(e) {
+        console.warn("Ringtone error:", e);
+      }
+    }
+
+    function stopRingtone() {
+      if (ringtoneOscillator) {
+        try { ringtoneOscillator.stop(); } catch(e){}
+        ringtoneOscillator = null;
+      }
+      if (ringtoneAudioCtx) {
+        try { ringtoneAudioCtx.close(); } catch(e){}
+        ringtoneAudioCtx = null;
+      }
+    }
+
+    // --- 着信トリガー ---
     function triggerIncomingCall(capsule) {
+      activeCallingCapsule = capsule;
       document.getElementById('call-sender-name').innerText = capsule.senderName;
       document.getElementById('call-status-text').innerText = "未来からの着信...";
       document.getElementById('accept-call-btn').classList.remove('hidden');
       document.getElementById('call-overlay').classList.remove('hidden');
+
+      startRingtone();
     }
 
+    // --- 通話応答 ---
     function acceptCall() {
+      stopRingtone();
+
       document.getElementById('accept-call-btn').classList.add('hidden');
       document.getElementById('call-status-text').innerText = "通話中: 00:00";
       callSeconds = 0;
+      clearInterval(callTimerInterval);
+      
       callTimerInterval = setInterval(() => {
         callSeconds++;
         const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
@@ -370,16 +406,29 @@
         document.getElementById('call-status-text').innerText = `通話中: ${mins}:${secs}`;
       }, 1000);
 
-      if (audioUrl) {
-        audioPlayer.src = audioUrl;
-        audioPlayer.play().catch(e => console.warn(e));
+      // カプセルの音声を再生
+      if (activeCallingCapsule && activeCallingCapsule.audioUrl) {
+        audioPlayer.src = activeCallingCapsule.audioUrl;
+        audioPlayer.play().catch(e => {
+          console.warn("Audio play error:", e);
+          alert("音声の再生に失敗しました。ブラウザの自動再生ブロックが影響している可能性があります。");
+        });
+
+        audioPlayer.onended = () => {
+          document.getElementById('call-status-text').innerText = "通話終了";
+        };
+      } else {
+        alert("再生可能な音声データが見つかりませんでした。");
       }
     }
 
+    // --- 通話切断 ---
     function endCall() {
+      stopRingtone();
       clearInterval(callTimerInterval);
       audioPlayer.pause();
       document.getElementById('call-overlay').classList.add('hidden');
+      activeCallingCapsule = null;
     }
 
     function switchTab(tab) {
