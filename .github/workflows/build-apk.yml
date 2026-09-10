@@ -10,86 +10,86 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  - name: Setup Node.js
-    uses: actions/setup-node@v4
-    with:
-      node-version: 20
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-  - name: Setup Java
-    uses: actions/setup-java@v4
-    with:
-      distribution: zulu
-      java-version: 17
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
 
-  - name: Setup Android SDK
-    uses: android-actions/setup-android@v3
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-  - name: Install dependencies
-    run: npm install
+      - name: Install dependencies
+        run: npm install
 
-  - name: Add Android platform
-    run: |
-      npx cap add android || true
+      - name: Add Android platform
+        run: |
+          npx cap add android || true
 
-  - name: Force Custom App Icon
-    run: |
-      # Ensure target folders exist
-      mkdir -p android/app/src/main/res/mipmap-hdpi
-      mkdir -p android/app/src/main/res/mipmap-mdpi
-      mkdir -p android/app/src/main/res/mipmap-xhdpi
-      mkdir -p android/app/src/main/res/mipmap-xxhdpi
-      mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+      - name: Force Custom App Icon
+        run: |
+          # Ensure target folders exist
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
 
-      # Remove Android 8+ Adaptive Icon XMLs that override PNG icons
-      rm -rf android/app/src/main/res/mipmap-anydpi-v26/ic_launcher*.xml || true
+          # Remove Android 8+ Adaptive Icon XMLs that override PNG icons
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26/ic_launcher*.xml || true
 
-      ICON_FILE=""
-      for f in "www/icon.png" "www/icon.jpg" "icon.png" "icon.jpg" "icon_3.jpg" "www/icon_3.jpg"; do
-        if [ -f "$f" ]; then
-          ICON_FILE="$f"
-          break
-        fi
-      done
+          ICON_FILE=""
+          for f in "www/icon.png" "www/icon.jpg" "icon.png" "icon.jpg" "icon_3.jpg" "www/icon_3.jpg"; do
+            if [ -f "$f" ]; then
+              ICON_FILE="$f"
+              break
+            fi
+          done
 
-      if [ -n "$ICON_FILE" ]; then
-        echo "Applying icon from: $ICON_FILE"
-        cp "$ICON_FILE" android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
-        cp "$ICON_FILE" android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
-        cp "$ICON_FILE" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
-        cp "$ICON_FILE" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
-        cp "$ICON_FILE" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
+          if [ -n "$ICON_FILE" ]; then
+            echo "Applying icon from: $ICON_FILE"
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
 
-        cp "$ICON_FILE" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png || true
-        cp "$ICON_FILE" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png || true
-        cp "$ICON_FILE" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
-        cp "$ICON_FILE" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
-        cp "$ICON_FILE" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png || true
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png || true
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
 
-        mkdir -p www
-        cp "$ICON_FILE" www/icon.png || true
-      fi
+            mkdir -p www
+            cp "$ICON_FILE" www/icon.png || true
+          fi
 
-  - name: Add microphone permission
-    run: |
-      if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
-        sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' android/app/src/main/AndroidManifest.xml || true
-      fi
+      - name: Add microphone permission
+        run: |
+          if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' android/app/src/main/AndroidManifest.xml || true
+          fi
 
-  - name: Sync Web assets
-    run: npx cap sync android
+      - name: Sync Web assets
+        run: npx cap sync android
 
-  - name: Build APK
-    run: |
-      cd android
-      chmod +x gradlew
-      ./gradlew assembleDebug
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
-  - name: Upload APK
-    uses: actions/upload-artifact@v4
-    with:
-      name: Ourie-App-APK
-      path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ourie-App-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
