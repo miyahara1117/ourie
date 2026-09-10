@@ -187,7 +187,7 @@
       }
     }
 
-    // 録音コントロール
+    // 録音コントロール（Pixel 7 Pro等の高音質・ノイズキャンセリング制御対応）
     async function toggleRecording() {
       const micBtn = document.getElementById('mic-btn');
       const micIcon = document.getElementById('mic-icon');
@@ -196,7 +196,16 @@
 
       if (!isRecording) {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // Pixel等の多重マイク性能を活かすオーディオ設定
+          const constraints = {
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 44100
+            }
+          };
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
           mediaRecorder = new MediaRecorder(stream);
           audioChunks = [];
 
@@ -334,7 +343,7 @@
       document.getElementById('call-overlay').classList.remove('hidden');
     }
 
-    // 電話に応答
+    // 電話に応答（受話スピーカー出力指定対応）
     function acceptCall() {
       document.getElementById('accept-call-btn').classList.add('hidden');
       document.getElementById('call-status-text').innerText = "通話中: 00:00";
@@ -349,6 +358,17 @@
 
       if (audioUrl) {
         audioPlayer.src = audioUrl;
+        
+        // 受話口（Earpiece）へ音声出力先を切り替える指定
+        if (typeof audioPlayer.setSinkId === 'function') {
+          navigator.mediaDevices.enumerateDevices().then(devices => {
+            const earpiece = devices.find(device => device.kind === 'audiooutput' && device.deviceId.includes('earpiece'));
+            if (earpiece) {
+              audioPlayer.setSinkId(earpiece.deviceId);
+            }
+          }).catch(() => {});
+        }
+        
         audioPlayer.play();
       }
     }
