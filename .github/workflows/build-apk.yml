@@ -1,0 +1,51 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: コードチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Java (JDK 17) セットアップ
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Android SDK セットアップ
+        uses: android-actions/setup-android@v3
+
+      - name: 依存関係のインストール & プラットフォーム追加
+        run: |
+          npm install
+          npx cap add android
+
+      - name: AndroidManifestにマイク・音声設定権限を自動追加
+        run: |
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' android/app/src/main/AndroidManifest.xml
+
+      - name: Webアセット同期
+        run: npx cap sync android
+
+      - name: APKビルド
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: 完成したAPKの保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ourie-App-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
