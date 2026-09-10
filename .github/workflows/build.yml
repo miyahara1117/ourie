@@ -30,6 +30,7 @@ jobs:
           cordova create build_app com.ourie.app Ourie
           rm -rf build_app/www
           cp -r www build_app/www
+          sed -i '/<\/widget>/i \    <icon src="www/icon.png" />' build_app/config.xml
 
       - name: Add Android Platform
         run: |
