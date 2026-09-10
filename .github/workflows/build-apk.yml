@@ -22,8 +22,8 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-         distribution: zulu
-         java-version: 17
+          distribution: zulu
+          java-version: 17
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -44,22 +44,22 @@ jobs:
       
           ICON_FILE=""
           if [ -f "www/icon.png" ]; then
-          ICON_FILE="www/icon.png"
+            ICON_FILE="www/icon.png"
           elif [ -f "www/icon.jpg" ]; then
-          ICON_FILE="www/icon.jpg"
+            ICON_FILE="www/icon.jpg"
           fi
       
           if [ -n "$ICON_FILE" ]; then
-          cp "$ICON_FILE" android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          cp "$ICON_FILE" android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-          cp "$ICON_FILE" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          cp "$ICON_FILE" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          cp "$ICON_FILE" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-          cp "$ICON_FILE" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
-          cp "$ICON_FILE" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
-          cp "$ICON_FILE" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
-          cp "$ICON_FILE" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
-          cp "$ICON_FILE" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+            cp "$ICON_FILE" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
           fi
 
       - name: Add microphone permission
