@@ -9,18 +9,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install Cordova
         run: npm install -g cordova
@@ -30,8 +30,7 @@ jobs:
           cordova create build_app com.ourie.app Ourie
           rm -rf build_app/www
           cp -r www build_app/www
-          sed -i '/<\/widget>/i \    <icon src="www/icon.png" />' build_app/config.xml
-          sed -i '/<\/widget>/i \    <config-file target="AndroidManifest.xml" parent="/*"><uses-permission android:name="android.permission.RECORD_AUDIO" /><uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" /></config-file>' build_app/config.xml
+          cp config.xml build_app/config.xml
 
       - name: Add Android Platform
         run: |
