@@ -1,7 +1,7 @@
 name: Build Android APK
 
 on:push:
-on:push:branches:- mainworkflow_dispatch:
+on: push:branches:- mainworkflow_dispatch:
 
 jobs:build:runs-on: ubuntu-latest
 
