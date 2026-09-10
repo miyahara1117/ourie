@@ -36,7 +36,19 @@ uses: actions/checkout@v4
 
   - name: マイク権限の設定注入
     run: |
-      sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-feature android:name="android.hardware.microphone" android:required="true" />' android/app/src/main/AndroidManifest.xml
+      python3 -c "
+      import os
+      manifest_path = 'android/app/src/main/AndroidManifest.xml'
+      if os.path.exists(manifest_path):
+          with open(manifest_path, 'r', encoding='utf-8') as f:
+              content = f.read()
+          perms = '\n    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />\n    <uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\" />\n    <uses-feature android:name=\"android.hardware.microphone\" android:required=\"true\" />\n'
+          if 'RECORD_AUDIO' not in content:
+              content = content.replace('</manifest>', perms + '</manifest>')
+              with open(manifest_path, 'w', encoding='utf-8') as f:
+                  f.write(content)
+              print('Manifest permissions successfully added.')
+      "
 
   - name: APKビルド
     working-directory: android
