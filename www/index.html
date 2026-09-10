@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ourie</title>
   <!-- Chosen Palette: Slate & Purple Night Theme -->
-  <!-- Application Structure Plan: Single-page application simulating an incoming voice call time-capsule service ("Ourie") with options for recording future messages, receiving scheduled calls, recording immediate replies, and switching audio routing between earpiece and speaker mode for authentic telephone interaction. -->
-  <!-- Visualization & Content Choices: Clean Tailwind layout with HTML/CSS interactive elements, audio player handling, and modal phone UI. CONFIRMING: NO SVG, NO Mermaid JS. -->
+  <!-- Application Structure Plan: Single-page interactive phone application allowing users to record voice messages for the future, set call schedules, respond during simulated incoming calls, and toggle between earpiece receiver and loudspeaker during active calls using native audio toggle API. -->
+  <!-- Visualization & Content Choices: Clean Tailwind layout with HTML/CSS interactive components, HTML Audio API player handling, call screen overlay, and Cordova AudioToggle routing integration. CONFIRMING: NO SVG, NO Mermaid JS. -->
   <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -55,7 +55,7 @@
             <span>未来にあなたの声を送ります</span>
           </div>
           <p class="text-xs text-slate-300 leading-relaxed">
-            指定した日時に過去から電話がかかってきます。<br>返答して会話を思い出に残しましょう。
+            指定した日時に過去から電話がかかってきます。<br>耳に受話器をあてて会話を思い出に残しましょう。
           </p>
         </div>
 
@@ -126,17 +126,17 @@
           <p id="call-status-text" class="text-xs text-[#A78BFA] mt-1 font-medium">未来からの着信...</p>
         </div>
 
-        <!-- スピーカー切替ボタン（通話中のみ表示） -->
+        <!-- スピーカー切替ボタン -->
         <div id="speaker-toggle-container" class="hidden pt-2">
           <button id="speaker-toggle-btn" type="button" onclick="toggleSpeakerOutput()" 
             class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 text-xs rounded-full border border-purple-500/30 inline-flex items-center space-x-2">
-            <i id="speaker-toggle-icon" class="fa-solid fa-[#fa-ear-listen]"></i>
-            <span id="speaker-toggle-text">耳あて受話器モード</span>
+            <i id="speaker-toggle-icon" class="fa-solid fa-ear-listen"></i>
+            <span id="speaker-toggle-text">耳あて受話器モード中</span>
           </button>
         </div>
       </div>
 
-      <!-- 返答録音エリア（通話応答後に表示） -->
+      <!-- 返答録音エリア -->
       <div id="reply-area" class="hidden w-full max-w-xs bg-slate-900/90 border border-slate-700/80 rounded-2xl p-4 space-y-3 text-center my-auto">
         <div class="flex items-center justify-center space-x-1.5 text-xs text-purple-300 font-bold">
           <i class="fa-solid fa-reply text-xs"></i>
@@ -183,19 +183,16 @@
     let audioChunks = [];
     let currentStream = null;
 
-    // 着信管理用変数
     let activeCallingCapsule = null;
     let ringtoneAudioCtx = null;
     let ringtoneOscillator = null;
 
-    // 返答録音用変数
     let isReplyRecording = false;
     let replyMediaRecorder = null;
     let replyAudioChunks = [];
     let replyAudioBlob = null;
     let replyAudioUrl = null;
 
-    // スピーカー状態 (true: 本体スピーカー, false: 耳あて受話器)
     let isLoudspeaker = false;
 
     window.onload = () => {
@@ -206,6 +203,22 @@
       if (dateInput) dateInput.value = localDatetime;
       renderCapsules();
     };
+
+    function setNativeAudioMode(mode) {
+      if (window.AudioToggle && typeof window.AudioToggle.setAudioMode === 'function') {
+        try {
+          if (mode === 'EARPIECE') {
+            window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE);
+          } else if (mode === 'SPEAKER') {
+            window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
+          } else {
+            window.AudioToggle.setAudioMode(window.AudioToggle.NORMAL);
+          }
+        } catch (e) {
+          console.warn("AudioToggle error:", e);
+        }
+      }
+    }
 
     function stopActiveStream() {
       if (currentStream) {
@@ -219,13 +232,26 @@
     }
 
     async function getAudioStream() {
-      try {
-        return await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch (err) {
-        return await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: false, noiseSuppression: false }
-        });
+      const constraintsList = [
+        { audio: true },
+        { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } },
+        { audio: { channelCount: 1 } },
+        { audio: { sampleRate: 44100 } }
+      ];
+
+      let lastError = null;
+      for (const constraints of constraintsList) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          if (stream && stream.getAudioTracks().length > 0) {
+            return stream;
+          }
+        } catch (err) {
+          lastError = err;
+          console.warn("Constraint failed, trying next:", constraints, err);
+        }
       }
+      throw lastError || new Error("マイクを起動できませんでした");
     }
 
     async function startOrStopRecording() {
@@ -249,9 +275,16 @@
           currentStream = await getAudioStream();
           audioChunks = [];
 
-          const options = MediaRecorder.isTypeSupported('audio/webm') 
-            ? { mimeType: 'audio/webm' } 
-            : (MediaRecorder.isTypeSupported('audio/mp4') ? { mimeType: 'audio/mp4' } : {});
+          let options = {};
+          if (typeof MediaRecorder !== 'undefined') {
+            if (MediaRecorder.isTypeSupported('audio/webm')) {
+              options = { mimeType: 'audio/webm' };
+            } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+              options = { mimeType: 'audio/mp4' };
+            } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+              options = { mimeType: 'audio/aac' };
+            }
+          }
 
           mediaRecorder = new MediaRecorder(currentStream, options);
 
@@ -262,7 +295,7 @@
           };
 
           mediaRecorder.onstop = () => {
-            const mimeType = mediaRecorder.mimeType || 'audio/mp4';
+            const mimeType = (mediaRecorder && mediaRecorder.mimeType) ? mediaRecorder.mimeType : 'audio/mp4';
             recordedAudioBlob = new Blob(audioChunks, { type: mimeType });
             audioUrl = URL.createObjectURL(recordedAudioBlob);
             if (previewBtn) previewBtn.classList.remove('hidden');
@@ -310,6 +343,7 @@
         previewIcon.className = "fa-solid fa-play";
         previewText.innerText = "録音プレビュー再生";
       } else if (audioUrl) {
+        setNativeAudioMode('NORMAL');
         audioPlayer.src = audioUrl;
         audioPlayer.play().catch(e => console.warn(e));
         previewIcon.className = "fa-solid fa-pause";
@@ -405,6 +439,7 @@
 
     function playSavedAudio(url) {
       if (!url) return;
+      setNativeAudioMode('NORMAL');
       audioPlayer.src = url;
       audioPlayer.play().catch(e => console.warn(e));
     }
@@ -414,10 +449,10 @@
       renderCapsules();
     }
 
-    // --- 着信音合成 ---
     function startRingtone() {
       try {
         stopRingtone();
+        setNativeAudioMode('SPEAKER');
         ringtoneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
         ringtoneOscillator = ringtoneAudioCtx.createOscillator();
         const gainNode = ringtoneAudioCtx.createGain();
@@ -445,7 +480,6 @@
       }
     }
 
-    // --- 着信トリガー ---
     function triggerIncomingCall(capsule) {
       activeCallingCapsule = capsule;
       replyAudioBlob = null;
@@ -461,39 +495,33 @@
       startRingtone();
     }
 
-    // --- 音声出力（耳あて/スピーカー）制御 ---
-    async function toggleSpeakerOutput() {
+    function toggleSpeakerOutput() {
       isLoudspeaker = !isLoudspeaker;
       const text = document.getElementById('speaker-toggle-text');
+      const icon = document.getElementById('speaker-toggle-icon');
 
       if (isLoudspeaker) {
-        text.innerText = "本体スピーカーモード";
+        text.innerText = "本体スピーカーモード中";
+        icon.className = "fa-solid fa-volume-high";
+        setNativeAudioMode('SPEAKER');
       } else {
-        text.innerText = "耳あて受話器モード";
-      }
-
-      // Web API (setSinkId) でデバイスの切り替えを試行
-      if (typeof audioPlayer.setSinkId === 'function') {
-        try {
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
-          const target = audioOutputs.find(d => isLoudspeaker ? d.label.includes('speaker') : d.label.includes('earpiece') || d.label.includes('telephony'));
-          if (target) {
-            await audioPlayer.setSinkId(target.deviceId);
-          }
-        } catch(e) {
-          console.warn("setSinkId switch error:", e);
-        }
+        text.innerText = "耳あて受話器モード中";
+        icon.className = "fa-solid fa-ear-listen";
+        setNativeAudioMode('EARPIECE');
       }
     }
 
-    // --- 通話応答 ---
     function acceptCall() {
       stopRingtone();
+
+      isLoudspeaker = false;
+      setNativeAudioMode('EARPIECE');
 
       document.getElementById('accept-call-btn').classList.add('hidden');
       document.getElementById('reply-area').classList.remove('hidden');
       document.getElementById('speaker-toggle-container').classList.remove('hidden');
+      document.getElementById('speaker-toggle-text').innerText = "耳あて受話器モード中";
+      document.getElementById('speaker-toggle-icon').className = "fa-solid fa-ear-listen";
       document.getElementById('call-status-text').innerText = "通話中: 00:00";
       callSeconds = 0;
       clearInterval(callTimerInterval);
@@ -505,7 +533,6 @@
         document.getElementById('call-status-text').innerText = `通話中: ${mins}:${secs}`;
       }, 1000);
 
-      // カプセルの音声を再生
       if (activeCallingCapsule && activeCallingCapsule.audioUrl) {
         audioPlayer.src = activeCallingCapsule.audioUrl;
         audioPlayer.play().catch(e => {
@@ -518,7 +545,6 @@
       }
     }
 
-    // --- 返答録音機能 ---
     async function toggleReplyRecording() {
       const micBtn = document.getElementById('reply-mic-btn');
       const micIcon = document.getElementById('reply-mic-icon');
@@ -533,9 +559,14 @@
           currentStream = await getAudioStream();
           replyAudioChunks = [];
 
-          const options = MediaRecorder.isTypeSupported('audio/webm') 
-            ? { mimeType: 'audio/webm' } 
-            : (MediaRecorder.isTypeSupported('audio/mp4') ? { mimeType: 'audio/mp4' } : {});
+          let options = {};
+          if (typeof MediaRecorder !== 'undefined') {
+            if (MediaRecorder.isTypeSupported('audio/webm')) {
+              options = { mimeType: 'audio/webm' };
+            } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+              options = { mimeType: 'audio/mp4' };
+            }
+          }
 
           replyMediaRecorder = new MediaRecorder(currentStream, options);
 
@@ -546,7 +577,7 @@
           };
 
           replyMediaRecorder.onstop = () => {
-            const mimeType = replyMediaRecorder.mimeType || 'audio/mp4';
+            const mimeType = (replyMediaRecorder && replyMediaRecorder.mimeType) ? replyMediaRecorder.mimeType : 'audio/mp4';
             replyAudioBlob = new Blob(replyAudioChunks, { type: mimeType });
             replyAudioUrl = URL.createObjectURL(replyAudioBlob);
             
@@ -605,7 +636,6 @@
       }
     }
 
-    // --- 通話切断 ---
     function endCall() {
       stopRingtone();
       clearInterval(callTimerInterval);
@@ -616,6 +646,8 @@
         try { replyMediaRecorder.stop(); } catch(e){}
       }
       stopActiveStream();
+
+      setNativeAudioMode('NORMAL');
 
       document.getElementById('call-overlay').classList.add('hidden');
       activeCallingCapsule = null;
