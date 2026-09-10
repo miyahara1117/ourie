@@ -9,32 +9,32 @@ jobs:
 build:
 runs-on: ubuntu-latest
 steps:
-- name: コードチェックアウト
+- name: Checkout repository
 uses: actions/checkout@v4
 
-  - name: Node.js セットアップ
+  - name: Setup Node.js
     uses: actions/setup-node@v4
     with:
-      node-version: 20
+      node-version: '20'
 
-  - name: Java (JDK 17) セットアップ
+  - name: Setup Java JDK
     uses: actions/setup-java@v4
     with:
       distribution: 'zulu'
       java-version: '17'
 
-  - name: Android SDK セットアップ
+  - name: Setup Android SDK
     uses: android-actions/setup-android@v3
 
-  - name: 依存関係のインストール
+  - name: Install dependencies
     run: npm install
 
-  - name: Androidプラットフォーム追加 & Webアセット同期
+  - name: Add Android platform and sync
     run: |
       npx cap add android || true
       npx cap sync android
 
-  - name: マイク権限の設定注入
+  - name: Inject microphone permissions
     run: |
       python3 -c "
       import os
@@ -50,13 +50,13 @@ uses: actions/checkout@v4
               print('Manifest permissions successfully added.')
       "
 
-  - name: APKビルド
+  - name: Build Debug APK
     working-directory: android
     run: |
       chmod +x gradlew
       ./gradlew assembleDebug
 
-  - name: 完成したAPKの保存
+  - name: Upload APK Artifact
     uses: actions/upload-artifact@v4
     with:
       name: Ourie-App-APK
