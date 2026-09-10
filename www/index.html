@@ -8,8 +8,8 @@
   <link rel="icon" id="app-favicon" href="icon.png" type="image/png">
   <link rel="apple-touch-icon" href="icon.png">
   <!-- Chosen Palette: Slate & Purple Night Theme -->
-  <!-- Application Structure Plan: Single-page interactive phone time-capsule app ensuring all playback modes (record preview, capsule history, in-call incoming message, reply) route to Earpiece by default using Web Audio API decoding and native audio toggles, while allowing user override to Loudspeaker via a global switch. -->
-  <!-- Visualization & Content Choices: Tailwind responsive UI, FontAwesome icons, Web Audio API + AudioToggle routing (Earpiece default + Loudspeaker toggle). CONFIRMING: NO SVG, NO Mermaid JS. -->
+  <!-- Application Structure Plan: Single-page interactive phone time-capsule app ensuring precise audio output routing (Earpiece by default vs Loudspeaker override) using HTML5 Audio, Web Audio API fallback, setSinkId API, and native AudioToggle integration without accidental playback stops during toggle. -->
+  <!-- Visualization & Content Choices: Tailwind responsive UI, FontAwesome icons, Web Audio API + HTML5 Audio + AudioToggle routing. CONFIRMING: NO SVG, NO Mermaid JS. -->
   <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -71,12 +71,12 @@
         <div class="p-3.5 rounded-2xl bg-gradient-to-r from-[#4C1D95]/60 to-[#1E293B] border border-[#7C3AED]/40 space-y-1 shadow-md">
           <div class="flex items-center justify-between">
             <div class="flex items-center space-x-1.5 text-[#A78BFA] text-xs font-bold">
-              <i class="fa-solid fa-ear-listen text-xs"></i>
+              <i id="banner-mode-icon" class="fa-solid fa-ear-listen text-xs"></i>
               <span id="banner-output-mode-text">再生出力を「耳あて通話スピーカー」に設定中</span>
             </div>
           </div>
-          <p class="text-[11px] text-slate-300 leading-relaxed">
-            録音直後の確認やメッセージ再生時は、耳をスマホ上部に当てて通話感覚でお聴きいただけます。右上のボタンで本体スピーカーへ切替可能です。
+          <p id="banner-subtext" class="text-[11px] text-slate-300 leading-relaxed">
+            スマホを耳に当てて通話感覚でお聴きいただけます。右上または下のボタンで本体スピーカーへ即座に切り替え可能です。
           </p>
         </div>
 
@@ -98,10 +98,23 @@
           </button>
           <p id="mic-status" class="text-xs text-slate-300 font-medium leading-normal">マイクボタンを押して録音開始</p>
 
-          <button id="preview-btn" type="button" onclick="playPreview()" class="hidden mx-auto px-4 py-2 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-2 border border-purple-400/30 transition-all">
-            <i id="preview-icon" class="fa-solid fa-phone-volume text-sm text-purple-200"></i>
-            <span id="preview-text">通話スピーカーで録音を確認</span>
-          </button>
+          <!-- Preview & Output Mode Controls Area -->
+          <div id="preview-container" class="hidden pt-2 border-t border-slate-700/50 space-y-2">
+            <div class="flex justify-center items-center space-x-2">
+              <button id="preview-play-btn" type="button" onclick="playPreview()" 
+                class="px-4 py-2 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-2 border border-purple-400/30 transition-all cursor-pointer">
+                <i id="preview-icon" class="fa-solid fa-play text-xs text-purple-200"></i>
+                <span id="preview-text">録音を再生</span>
+              </button>
+
+              <button type="button" onclick="toggleGlobalSpeakerMode()" 
+                class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-purple-200 text-xs font-medium rounded-xl border border-slate-600 flex items-center space-x-1 transition-all cursor-pointer">
+                <i class="fa-solid fa-arrows-rotate text-[11px] text-amber-300"></i>
+                <span id="console-speaker-toggle-text">受話器 ⇄ スピーカー</span>
+              </button>
+            </div>
+            <p id="preview-mode-hint" class="text-[10px] text-slate-400">耳をスマホ上部に当ててお聴きください</p>
+          </div>
         </div>
 
         <!-- Date & Time Selector -->
@@ -162,7 +175,7 @@
         <!-- Speaker Output Toggle Button (Call Screen) -->
         <div id="speaker-toggle-container" class="hidden pt-2">
           <button id="speaker-toggle-btn" type="button" onclick="toggleGlobalSpeakerMode()" 
-            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 text-xs font-semibold rounded-full border border-purple-500/40 inline-flex items-center space-x-2 shadow-md transition-all active:scale-95">
+            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 text-xs font-semibold rounded-full border border-purple-500/40 inline-flex items-center space-x-2 shadow-md transition-all active:scale-95 cursor-pointer">
             <i id="call-speaker-icon" class="fa-solid fa-phone-volume text-sm"></i>
             <span id="call-speaker-text">受話器（耳あて）モード</span>
           </button>
@@ -179,11 +192,11 @@
         
         <div class="flex justify-center items-center space-x-3">
           <button id="reply-mic-btn" type="button" onclick="toggleReplyRecording()" 
-            class="w-12 h-12 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-md active:scale-95 transition-all">
+            class="w-12 h-12 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-md active:scale-95 transition-all cursor-pointer">
             <i id="reply-mic-icon" class="fa-solid fa-microphone text-base"></i>
           </button>
 
-          <button id="reply-play-btn" type="button" onclick="playReplyPreview()" class="hidden px-3 py-2 bg-slate-800 text-purple-300 text-xs font-medium rounded-xl flex items-center space-x-1.5 border border-purple-500/30">
+          <button id="reply-play-btn" type="button" onclick="playReplyPreview()" class="hidden px-3 py-2 bg-slate-800 text-purple-300 text-xs font-medium rounded-xl flex items-center space-x-1.5 border border-purple-500/30 cursor-pointer">
             <i id="reply-play-icon" class="fa-solid fa-play text-xs"></i>
             <span id="reply-play-text">返答を確認</span>
           </button>
@@ -192,10 +205,10 @@
 
       <!-- Call Action Buttons -->
       <div class="mb-8 flex justify-center items-center space-x-12 w-full">
-        <button id="end-call-btn" type="button" onclick="endCall()" class="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/40 active:scale-95 transition-all">
+        <button id="end-call-btn" type="button" onclick="endCall()" class="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/40 active:scale-95 transition-all cursor-pointer">
           <i class="fa-solid fa-phone-slash text-2xl"></i>
         </button>
-        <button id="accept-call-btn" type="button" onclick="acceptCall()" class="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40 animate-bounce active:scale-95 transition-all">
+        <button id="accept-call-btn" type="button" onclick="acceptCall()" class="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40 animate-bounce active:scale-95 transition-all cursor-pointer">
           <i class="fa-solid fa-phone text-2xl"></i>
         </button>
       </div>
@@ -227,7 +240,8 @@
     // Default Audio Mode: EARPIECE (通話受話器 / 耳あて)
     let isSpeakerMode = false;
 
-    // Dynamic Audio Routing Control via Web Audio API & Native Bridge
+    // Active Playback State
+    let currentAudioElement = null;
     let activeAudioCtx = null;
     let activeAudioSource = null;
     let currentPlayingUrl = null;
@@ -247,7 +261,7 @@
       isSpeakerMode = !isSpeakerMode;
       updateSpeakerUI();
 
-      if (currentPlayingUrl) {
+      if (currentAudioElement || activeAudioSource) {
         applyCurrentAudioRoute();
       }
     }
@@ -258,8 +272,11 @@
       const globalText = document.getElementById('global-speaker-text');
 
       const bannerText = document.getElementById('banner-output-mode-text');
+      const bannerSubtext = document.getElementById('banner-subtext');
+      const bannerIcon = document.getElementById('banner-mode-icon');
       const callText = document.getElementById('call-speaker-text');
       const callIcon = document.getElementById('call-speaker-icon');
+      const hintText = document.getElementById('preview-mode-hint');
 
       if (isSpeakerMode) {
         if (globalIcon) globalIcon.className = "fa-solid fa-volume-high text-xs text-amber-300";
@@ -267,22 +284,54 @@
         if (globalBtn) globalBtn.className = "px-3 py-1 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-500/50 rounded-full flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95 shadow-sm";
 
         if (bannerText) bannerText.innerText = "再生出力を「本体スピーカー」に設定中";
+        if (bannerSubtext) bannerSubtext.innerText = "周囲に聞こえる本体スピーカーから再生されます。受話器に変更する場合はボタンを押してください。";
+        if (bannerIcon) bannerIcon.className = "fa-solid fa-volume-high text-xs text-amber-300";
+
         if (callText) callText.innerText = "本体スピーカーモード";
         if (callIcon) callIcon.className = "fa-solid fa-volume-high text-sm text-amber-300";
+        if (hintText) hintText.innerText = "本体スピーカーから再生されます";
       } else {
         if (globalIcon) globalIcon.className = "fa-solid fa-phone-volume text-xs text-[#A78BFA]";
         if (globalText) globalText.innerText = "受話器（耳あて）";
         if (globalBtn) globalBtn.className = "px-3 py-1 bg-[#1E293B] hover:bg-slate-800 border border-purple-500/40 rounded-full flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95 shadow-sm";
 
         if (bannerText) bannerText.innerText = "再生出力を「耳あて通話スピーカー」に設定中";
+        if (bannerSubtext) bannerSubtext.innerText = "スマホを耳に当てて通話感覚でお聴きいただけます。右上または下のボタンで本体スピーカーへ即座に切り替え可能です。";
+        if (bannerIcon) bannerIcon.className = "fa-solid fa-ear-listen text-xs text-[#A78BFA]";
+
         if (callText) callText.innerText = "受話器（耳あて）モード";
         if (callIcon) callIcon.className = "fa-solid fa-phone-volume text-sm text-purple-300";
+        if (hintText) hintText.innerText = "耳をスマホ上部に当ててお聴きください";
       }
     }
 
-    function applyCurrentAudioRoute() {
+    async function applyCurrentAudioRoute(audioEl = currentAudioElement) {
       const mode = isSpeakerMode ? 'SPEAKER' : 'EARPIECE';
       setNativeAudioMode(mode);
+
+      if (audioEl && typeof audioEl.setSinkId === 'function') {
+        try {
+          if (!isSpeakerMode) {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const earpiece = devices.find(d => 
+              d.kind === 'audiooutput' && 
+              (d.label.toLowerCase().includes('earpiece') || 
+               d.label.toLowerCase().includes('receiver') || 
+               d.label.toLowerCase().includes('telephony') || 
+               d.deviceId === 'communications')
+            );
+            if (earpiece) {
+              await audioEl.setSinkId(earpiece.deviceId);
+            } else if (devices.some(d => d.deviceId === 'communications')) {
+              await audioEl.setSinkId('communications');
+            }
+          } else {
+            await audioEl.setSinkId('');
+          }
+        } catch(e) {
+          console.warn("setSinkId route error:", e);
+        }
+      }
     }
 
     function setNativeAudioMode(mode) {
@@ -290,12 +339,8 @@
         try {
           if (mode === 'EARPIECE') {
             window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE);
-            setTimeout(() => {
-              try { window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE); } catch(e){}
-            }, 100);
-            setTimeout(() => {
-              try { window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE); } catch(e){}
-            }, 300);
+            setTimeout(() => { try { window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE); } catch(e){} }, 100);
+            setTimeout(() => { try { window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE); } catch(e){} }, 300);
           } else if (mode === 'SPEAKER') {
             window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
           } else {
@@ -308,6 +353,13 @@
     }
 
     function stopCurrentAudio() {
+      if (currentAudioElement) {
+        try {
+          currentAudioElement.pause();
+          currentAudioElement.currentTime = 0;
+        } catch(e){}
+        currentAudioElement = null;
+      }
       if (activeAudioSource) {
         try { activeAudioSource.stop(); } catch(e){}
         activeAudioSource = null;
@@ -316,6 +368,7 @@
         try { activeAudioCtx.close(); } catch(e){}
         activeAudioCtx = null;
       }
+
       currentPlayingUrl = null;
       setNativeAudioMode('NORMAL');
 
@@ -336,8 +389,31 @@
       currentPlayingUrl = url;
       currentOnEndedHandler = onEnded;
 
-      applyCurrentAudioRoute();
+      const audio = new Audio(url);
+      currentAudioElement = audio;
 
+      await applyCurrentAudioRoute(audio);
+
+      audio.onended = () => {
+        stopCurrentAudio();
+      };
+
+      audio.onerror = (e) => {
+        console.warn("HTMLAudioElement failed, attempting Web Audio API:", e);
+        playAudioWithWebAudioFallback(url, onEnded);
+      };
+
+      try {
+        await audio.play();
+        setTimeout(() => applyCurrentAudioRoute(audio), 100);
+        setTimeout(() => applyCurrentAudioRoute(audio), 300);
+      } catch (err) {
+        console.warn("HTMLAudioElement play blocked, attempting Web Audio API fallback:", err);
+        playAudioWithWebAudioFallback(url, onEnded);
+      }
+    }
+
+    async function playAudioWithWebAudioFallback(url, onEnded) {
       try {
         const response = await fetch(url);
         const arrayBuffer = await response.arrayBuffer();
@@ -350,35 +426,17 @@
 
         activeAudioSource.connect(activeAudioCtx.destination);
 
-        applyCurrentAudioRoute();
+        setNativeAudioMode(isSpeakerMode ? 'SPEAKER' : 'EARPIECE');
 
         activeAudioSource.onended = () => {
           stopCurrentAudio();
         };
 
         activeAudioSource.start(0);
-
-        setTimeout(() => applyCurrentAudioRoute(), 100);
-        setTimeout(() => applyCurrentAudioRoute(), 250);
-
-      } catch (err) {
-        console.warn("Web Audio API routing fallback:", err);
-        fallbackAudioPlay(url, onEnded);
+      } catch(err) {
+        console.error("Audio playback completely failed:", err);
+        stopCurrentAudio();
       }
-    }
-
-    function fallbackAudioPlay(url, onEnded) {
-      const fallbackAudio = new Audio(url);
-      applyCurrentAudioRoute();
-      fallbackAudio.play().then(() => {
-        applyCurrentAudioRoute();
-      }).catch(e => console.warn(e));
-
-      fallbackAudio.onended = () => {
-        currentPlayingUrl = null;
-        setNativeAudioMode('NORMAL');
-        if (onEnded) onEnded();
-      };
     }
 
     function stopActiveStream() {
@@ -418,7 +476,7 @@
       const micBtn = document.getElementById('mic-btn');
       const micIcon = document.getElementById('mic-icon');
       const micStatus = document.getElementById('mic-status');
-      const previewBtn = document.getElementById('preview-btn');
+      const previewContainer = document.getElementById('preview-container');
 
       stopCurrentAudio();
 
@@ -460,7 +518,7 @@
             const mimeType = (mediaRecorder && mediaRecorder.mimeType) ? mediaRecorder.mimeType : 'audio/mp4';
             recordedAudioBlob = new Blob(audioChunks, { type: mimeType });
             audioUrl = URL.createObjectURL(recordedAudioBlob);
-            if (previewBtn) previewBtn.classList.remove('hidden');
+            if (previewContainer) previewContainer.classList.remove('hidden');
             enableSubmitButton();
             stopActiveStream();
           };
@@ -492,31 +550,31 @@
         isRecording = false;
         micBtn.className = "w-20 h-20 rounded-full bg-[#7C3AED] text-white flex items-center justify-center mx-auto shadow-lg shadow-[#7C3AED]/40 active:scale-95 cursor-pointer";
         micIcon.className = "fa-solid fa-microphone text-2xl";
-        micStatus.innerText = "録音完了！";
+        micStatus.innerText = "録音完了！再生して確認できます";
       }
     }
 
     function playPreview() {
       const previewIcon = document.getElementById('preview-icon');
       const previewText = document.getElementById('preview-text');
-      const previewBtn = document.getElementById('preview-btn');
+      const previewPlayBtn = document.getElementById('preview-play-btn');
 
       if (!audioUrl) return;
 
       if (currentPlayingUrl === audioUrl) {
         stopCurrentAudio();
-        previewIcon.className = "fa-solid fa-phone-volume text-sm text-purple-200";
-        previewText.innerText = "通話スピーカーで録音を確認";
-        previewBtn.classList.remove('playing-glow');
+        previewIcon.className = "fa-solid fa-play text-xs text-purple-200";
+        previewText.innerText = "録音を再生";
+        previewPlayBtn.className = "px-4 py-2 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-2 border border-purple-400/30 transition-all cursor-pointer";
       } else {
-        previewIcon.className = "fa-solid fa-pause text-sm text-red-300";
-        previewText.innerText = isSpeakerMode ? "スピーカー再生中 (タップで停止)" : "耳あてで再生中 (タップで停止)";
-        previewBtn.classList.add('playing-glow');
+        previewIcon.className = "fa-solid fa-square text-xs text-red-300";
+        previewText.innerText = "■ 再生を停止";
+        previewPlayBtn.className = "px-4 py-2 bg-red-900/80 hover:bg-red-800 text-white text-xs font-semibold rounded-xl flex items-center space-x-2 border border-red-400/40 playing-glow transition-all cursor-pointer";
 
         playAudioWithEarpieceRouting(audioUrl, () => {
-          previewIcon.className = "fa-solid fa-phone-volume text-sm text-purple-200";
-          previewText.innerText = "通話スピーカーで録音を確認";
-          previewBtn.classList.remove('playing-glow');
+          previewIcon.className = "fa-solid fa-play text-xs text-purple-200";
+          previewText.innerText = "録音を再生";
+          previewPlayBtn.className = "px-4 py-2 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-2 border border-purple-400/30 transition-all cursor-pointer";
         });
       }
     }
@@ -553,7 +611,8 @@
         setTimeout(() => triggerIncomingCall(capsule), 3000);
       }
 
-      document.getElementById('preview-btn').classList.add('hidden');
+      const previewContainer = document.getElementById('preview-container');
+      if (previewContainer) previewContainer.classList.add('hidden');
       document.getElementById('mic-status').innerText = "マイクボタンを押して録音開始";
       const btn = document.getElementById('submit-btn');
       btn.disabled = true;
@@ -595,12 +654,12 @@
           </div>
 
           <div class="flex items-center space-x-2 pt-2 border-t border-slate-800">
-            <button type="button" onclick="playSavedAudio('${c.audioUrl}', this)" class="px-3 py-1.5 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-medium rounded-xl flex items-center space-x-1.5 border border-purple-500/30 transition-all">
-              <i class="fa-solid fa-phone-volume text-[10px]"></i>
-              <span>メッセージを聴く</span>
+            <button type="button" onclick="playSavedAudio('${c.audioUrl}', this)" class="px-3 py-1.5 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-medium rounded-xl flex items-center space-x-1.5 border border-purple-500/30 transition-all cursor-pointer">
+              <i class="fa-solid fa-play text-[10px]"></i>
+              <span>メッセージを再生</span>
             </button>
             ${c.replyAudioUrl ? `
-              <button type="button" onclick="playSavedAudio('${c.replyAudioUrl}', this)" class="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-medium rounded-xl flex items-center space-x-1.5 border border-emerald-500/30 transition-all">
+              <button type="button" onclick="playSavedAudio('${c.replyAudioUrl}', this)" class="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-medium rounded-xl flex items-center space-x-1.5 border border-emerald-500/30 transition-all cursor-pointer">
                 <i class="fa-solid fa-reply text-[10px]"></i>
                 <span>当時の返答</span>
               </button>
@@ -617,16 +676,16 @@
 
       if (currentPlayingUrl === url) {
         stopCurrentAudio();
-        if (icon) icon.className = "fa-solid fa-phone-volume text-[10px]";
+        if (icon) icon.className = "fa-solid fa-play text-[10px]";
         btnElement.classList.remove('playing-glow');
         return;
       }
 
-      if (icon) icon.className = "fa-solid fa-pause text-[10px]";
+      if (icon) icon.className = "fa-solid fa-square text-[10px]";
       btnElement.classList.add('playing-glow');
 
       playAudioWithEarpieceRouting(url, () => {
-        if (icon) icon.className = "fa-solid fa-phone-volume text-[10px]";
+        if (icon) icon.className = "fa-solid fa-play text-[10px]";
         btnElement.classList.remove('playing-glow');
       });
     }
@@ -790,8 +849,8 @@
         icon.className = "fa-solid fa-play text-xs";
         text.innerText = "返答を確認";
       } else {
-        icon.className = "fa-solid fa-pause text-xs";
-        text.innerText = "再生中 (停止)";
+        icon.className = "fa-solid fa-square text-xs";
+        text.innerText = "■ 返答再生を停止";
 
         playAudioWithEarpieceRouting(replyAudioUrl, () => {
           icon.className = "fa-solid fa-play text-xs";
