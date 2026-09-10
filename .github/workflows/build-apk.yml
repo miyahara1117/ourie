@@ -34,23 +34,12 @@ steps:
   - name: Add Android platform
     run: npx cap add android || true
 
-  - name: Sync Web assets
-    run: npx cap sync android
-
   - name: Add microphone permission
     run: |
-      node -e "
-      const fs = require('fs');
-      const file = 'android/app/src/main/AndroidManifest.xml';
-      if (fs.existsSync(file)) {
-        let content = fs.readFileSync(file, 'utf8');
-        if (!content.includes('RECORD_AUDIO')) {
-          const perm = '    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />\n</manifest>';
-          content = content.replace('</manifest>', perm);
-          fs.writeFileSync(file, content);
-        }
-      }
-      "
+      sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' android/app/src/main/AndroidManifest.xml || true
+
+  - name: Sync Web assets
+    run: npx cap sync android
 
   - name: Build APK
     run: |
