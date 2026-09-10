@@ -68,7 +68,7 @@
             class="w-20 h-20 rounded-full bg-[#7C3AED] text-white flex items-center justify-center mx-auto transition-all shadow-lg shadow-[#7C3AED]/40 active:scale-95 cursor-pointer">
             <i id="mic-icon" class="fa-solid fa-microphone text-2xl"></i>
           </button>
-          <p id="mic-status" class="text-xs text-slate-300">マイクボタンを押して録音開始</p>
+          <p id="mic-status" class="text-xs text-slate-300 leading-normal">マイクボタンを押して録音開始</p>
 
           <button id="preview-btn" type="button" onclick="playPreview()" class="hidden mx-auto px-4 py-2 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-2">
             <i id="preview-icon" class="fa-solid fa-play"></i>
@@ -145,6 +145,7 @@
     let callSeconds = 0;
     let mediaRecorder = null;
     let audioChunks = [];
+    let currentStream = null;
 
     window.onload = () => {
       const now = new Date();
@@ -154,6 +155,31 @@
       if (dateInput) dateInput.value = localDatetime;
       renderCapsules();
     };
+
+    // 音声ストリームの安全な解放関数
+    function stopActiveStream() {
+      if (currentStream) {
+        try {
+          currentStream.getTracks().forEach(track => track.stop());
+        } catch(e) {
+          console.warn("Track stop error:", e);
+        }
+        currentStream = null;
+      }
+    }
+
+    // マイクの取得（端末ドライバとの衝突を避けるフォールバック処理付き）
+    async function getAudioStream() {
+      // 1. まず最もシンプルな権限要求を試す（最も互換性が高い）
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        // 2. 失敗した場合は特定のオプションを試行
+        return await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: false, noiseSuppression: false }
+        });
+      }
+    }
 
     // 録音の開始・停止処理
     async function startOrStopRecording() {
@@ -171,15 +197,18 @@
           return;
         }
 
+        stopActiveStream();
+
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // マイクストリームを取得
+          currentStream = await getAudioStream();
           audioChunks = [];
 
           const options = MediaRecorder.isTypeSupported('audio/webm') 
             ? { mimeType: 'audio/webm' } 
             : (MediaRecorder.isTypeSupported('audio/mp4') ? { mimeType: 'audio/mp4' } : {});
 
-          mediaRecorder = new MediaRecorder(stream, options);
+          mediaRecorder = new MediaRecorder(currentStream, options);
 
           mediaRecorder.ondataavailable = event => {
             if (event.data && event.data.size > 0) {
@@ -193,8 +222,7 @@
             audioUrl = URL.createObjectURL(recordedAudioBlob);
             if (previewBtn) previewBtn.classList.remove('hidden');
             enableSubmitButton();
-
-            stream.getTracks().forEach(track => track.stop());
+            stopActiveStream();
           };
 
           mediaRecorder.start(100);
@@ -205,15 +233,20 @@
         } catch (err) {
           console.error("録音起動エラー:", err);
           isRecording = false;
+          stopActiveStream();
+          
           micBtn.className = "w-20 h-20 rounded-full bg-[#7C3AED] text-white flex items-center justify-center mx-auto shadow-lg shadow-[#7C3AED]/40 active:scale-95 cursor-pointer";
           micIcon.className = "fa-solid fa-microphone text-2xl";
 
           if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-            micStatus.innerText = "マイク権限が拒否されています";
-            alert("マイクの利用が許可されていません。\n端末の「設定」>「アプリ」>「Ourie」>「権限」からマイクを許可してください。");
+            micStatus.innerText = "マイク権限がOFFになっています";
+            alert("スマホの「設定」>「アプリ」>「Ourie」>「権限」からマイクを「許可」に設定してください。");
+          } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+            micStatus.innerText = "マイクの初期化に失敗しました";
+            alert("【マイク起動エラー】\n1. スマホの「設定」>「アプリ」>「Ourie」>「権限」でマイクが許可されているかご確認ください。\n2. スマホを再起動してから再度お試しください。");
           } else {
             micStatus.innerText = "エラー: " + (err.name || "マイクを開けません");
-            alert("マイクの起動に失敗しました: " + err.message);
+            alert("マイクの起動に失敗しました: " + (err.message || err.name));
           }
         }
       } else {
