@@ -20,7 +20,6 @@
       70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
       100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
     }
-    /* 日時入力のカラー調整 */
     input[type="datetime-local"]::-webkit-calendar-picker-indicator {
       filter: invert(1);
       cursor: pointer;
@@ -65,13 +64,13 @@
 
         <!-- 録音カード -->
         <div class="p-6 bg-[#1E293B] rounded-3xl border border-slate-700/60 text-center space-y-3">
-          <button id="mic-btn" onclick="toggleRecording()" 
-            class="w-20 h-20 rounded-full bg-[#7C3AED] text-white flex items-center justify-center mx-auto transition-all shadow-lg shadow-[#7C3AED]/40">
+          <button id="mic-btn" type="button" onclick="startOrStopRecording()" 
+            class="w-20 h-20 rounded-full bg-[#7C3AED] text-white flex items-center justify-center mx-auto transition-all shadow-lg shadow-[#7C3AED]/40 active:scale-95 cursor-pointer">
             <i id="mic-icon" class="fa-solid fa-microphone text-2xl"></i>
           </button>
           <p id="mic-status" class="text-xs text-slate-300">マイクボタンを押して録音開始</p>
 
-          <button id="preview-btn" onclick="playPreview()" class="hidden mx-auto px-4 py-2 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-2">
+          <button id="preview-btn" type="button" onclick="playPreview()" class="hidden mx-auto px-4 py-2 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-2">
             <i id="preview-icon" class="fa-solid fa-play"></i>
             <span id="preview-text">録音プレビュー再生</span>
           </button>
@@ -85,7 +84,7 @@
         </div>
 
         <!-- 送信ボタン -->
-        <button id="submit-btn" disabled onclick="saveCapsule()" 
+        <button id="submit-btn" type="button" disabled onclick="saveCapsule()" 
           class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold text-sm rounded-2xl flex items-center justify-center space-x-2 transition-all">
           <i class="fa-solid fa-paper-plane text-xs"></i>
           <span id="submit-text">未来へタイムカプセルを飛ばす</span>
@@ -95,28 +94,25 @@
       <!-- 【画面2】蓄積履歴 (CapsuleListScreen) -->
       <div id="screen-history" class="hidden space-y-4">
         <h2 class="text-base font-bold text-white">蓄積履歴 & 封印カプセル</h2>
-        <div id="capsule-list" class="space-y-3">
-          <!-- JSで動的にカプセルカードが生成されます -->
-        </div>
+        <div id="capsule-list" class="space-y-3"></div>
       </div>
 
     </div>
 
     <!-- ボトムナビゲーション -->
     <div class="absolute bottom-0 left-0 right-0 h-16 bg-[#0F172A] border-t border-slate-800/80 flex justify-around items-center px-4">
-      <button id="nav-record" onclick="switchTab('record')" class="flex flex-col items-center space-y-1 text-[#A78BFA]">
+      <button id="nav-record" type="button" onclick="switchTab('record')" class="flex flex-col items-center space-y-1 text-[#A78BFA]">
         <i class="fa-solid fa-microphone text-lg"></i>
         <span class="text-[10px] font-medium">カプセル作成</span>
       </button>
-      <button id="nav-history" onclick="switchTab('history')" class="flex flex-col items-center space-y-1 text-slate-400">
+      <button id="nav-history" type="button" onclick="switchTab('history')" class="flex flex-col items-center space-y-1 text-slate-400">
         <i class="fa-solid fa-clock-rotate-left text-lg"></i>
         <span class="text-[10px] font-medium">蓄積履歴</span>
       </button>
     </div>
 
-    <!-- 【オーバーレイ】着信画面 (IncomingCallOverlay) -->
+    <!-- 【オーバーレイ】着信画面 -->
     <div id="call-overlay" class="hidden absolute inset-0 bg-black z-50 p-8 flex flex-col justify-between items-center text-center">
-      <!-- 発信者情報 -->
       <div class="mt-12 space-y-4 w-full">
         <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-[#7C3AED] to-[#6366F1] flex items-center justify-center mx-auto shadow-2xl shadow-indigo-500/30">
           <i class="fa-solid fa-user text-4xl text-white"></i>
@@ -127,15 +123,11 @@
         </div>
       </div>
 
-      <!-- ボタン操作 -->
       <div class="mb-12 flex justify-center items-center space-x-12 w-full">
-        <!-- 拒否/切断 -->
-        <button onclick="endCall()" class="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/40">
+        <button type="button" onclick="endCall()" class="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/40">
           <i class="fa-solid fa-phone-slash text-2xl"></i>
         </button>
-
-        <!-- 応答ボタン -->
-        <button id="accept-call-btn" onclick="acceptCall()" class="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40 animate-bounce">
+        <button id="accept-call-btn" type="button" onclick="acceptCall()" class="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40 animate-bounce">
           <i class="fa-solid fa-phone text-2xl"></i>
         </button>
       </div>
@@ -144,7 +136,6 @@
   </div>
 
   <script>
-    // 状態管理
     let isRecording = false;
     let recordedAudioBlob = null;
     let audioUrl = null;
@@ -155,19 +146,209 @@
     let mediaRecorder = null;
     let audioChunks = [];
 
-    // 初期化（現在時刻の1分後を初期値セット）
     window.onload = () => {
       const now = new Date();
       now.setMinutes(now.getMinutes() + 1);
-      
-      // yyyy-MM-ddThh:mm 形式に整形
       const localDatetime = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-      document.getElementById('datetime-input').value = localDatetime;
-
+      const dateInput = document.getElementById('datetime-input');
+      if (dateInput) dateInput.value = localDatetime;
       renderCapsules();
     };
 
-    // タブ切り替え
+    // 録音の開始・停止処理
+    async function startOrStopRecording() {
+      const micBtn = document.getElementById('mic-btn');
+      const micIcon = document.getElementById('mic-icon');
+      const micStatus = document.getElementById('mic-status');
+      const previewBtn = document.getElementById('preview-btn');
+
+      if (!isRecording) {
+        micStatus.innerText = "マイクを起動中...";
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          micStatus.innerText = "お使いの環境はマイク録音に未対応です";
+          alert("この端末環境ではマイク機能がサポートされていません。");
+          return;
+        }
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioChunks = [];
+
+          const options = MediaRecorder.isTypeSupported('audio/webm') 
+            ? { mimeType: 'audio/webm' } 
+            : (MediaRecorder.isTypeSupported('audio/mp4') ? { mimeType: 'audio/mp4' } : {});
+
+          mediaRecorder = new MediaRecorder(stream, options);
+
+          mediaRecorder.ondataavailable = event => {
+            if (event.data && event.data.size > 0) {
+              audioChunks.push(event.data);
+            }
+          };
+
+          mediaRecorder.onstop = () => {
+            const mimeType = mediaRecorder.mimeType || 'audio/mp4';
+            recordedAudioBlob = new Blob(audioChunks, { type: mimeType });
+            audioUrl = URL.createObjectURL(recordedAudioBlob);
+            if (previewBtn) previewBtn.classList.remove('hidden');
+            enableSubmitButton();
+
+            stream.getTracks().forEach(track => track.stop());
+          };
+
+          mediaRecorder.start(100);
+          isRecording = true;
+          micBtn.className = "w-20 h-20 rounded-full bg-red-500 text-white flex items-center justify-center mx-auto pulse-animation cursor-pointer";
+          micIcon.className = "fa-solid fa-square text-2xl";
+          micStatus.innerText = "録音中... タップで停止";
+        } catch (err) {
+          console.error("録音起動エラー:", err);
+          isRecording = false;
+          micBtn.className = "w-20 h-20 rounded-full bg-[#7C3AED] text-white flex items-center justify-center mx-auto shadow-lg shadow-[#7C3AED]/40 active:scale-95 cursor-pointer";
+          micIcon.className = "fa-solid fa-microphone text-2xl";
+
+          if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            micStatus.innerText = "マイク権限が拒否されています";
+            alert("マイクの利用が許可されていません。\n端末の「設定」>「アプリ」>「Ourie」>「権限」からマイクを許可してください。");
+          } else {
+            micStatus.innerText = "エラー: " + (err.name || "マイクを開けません");
+            alert("マイクの起動に失敗しました: " + err.message);
+          }
+        }
+      } else {
+        try {
+          if (mediaRecorder && mediaRecorder.state !== "inactive") {
+            mediaRecorder.stop();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+        isRecording = false;
+        micBtn.className = "w-20 h-20 rounded-full bg-[#7C3AED] text-white flex items-center justify-center mx-auto shadow-lg shadow-[#7C3AED]/40 active:scale-95 cursor-pointer";
+        micIcon.className = "fa-solid fa-microphone text-2xl";
+        micStatus.innerText = "録音完了！";
+      }
+    }
+
+    function playPreview() {
+      const previewIcon = document.getElementById('preview-icon');
+      const previewText = document.getElementById('preview-text');
+
+      if (!audioPlayer.paused) {
+        audioPlayer.pause();
+        previewIcon.className = "fa-solid fa-play";
+        previewText.innerText = "録音プレビュー再生";
+      } else if (audioUrl) {
+        audioPlayer.src = audioUrl;
+        audioPlayer.play().catch(e => console.warn(e));
+        previewIcon.className = "fa-solid fa-pause";
+        previewText.innerText = "停止";
+        audioPlayer.onended = () => {
+          previewIcon.className = "fa-solid fa-play";
+          previewText.innerText = "録音プレビュー再生";
+        };
+      }
+    }
+
+    function enableSubmitButton() {
+      const btn = document.getElementById('submit-btn');
+      if (!btn) return;
+      btn.disabled = false;
+      btn.className = "w-full py-3.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-sm rounded-2xl flex items-center justify-center space-x-2 transition-all shadow-lg shadow-[#7C3AED]/30";
+    }
+
+    function saveCapsule() {
+      const senderName = document.getElementById('sender-input').value.trim() || '過去の自分';
+      const targetTimeVal = document.getElementById('datetime-input').value;
+      if (!targetTimeVal) return;
+
+      const targetTime = new Date(targetTimeVal);
+      const delayMs = targetTime.getTime() - Date.now();
+
+      const capsule = {
+        id: Date.now(),
+        senderName: senderName,
+        targetTime: targetTime,
+        audioUrl: audioUrl
+      };
+
+      capsules.push(capsule);
+      renderCapsules();
+
+      if (delayMs > 0) {
+        setTimeout(() => triggerIncomingCall(capsule), delayMs);
+      }
+
+      audioUrl = null;
+      document.getElementById('preview-btn').classList.add('hidden');
+      document.getElementById('mic-status').innerText = "マイクボタンを押して録音開始";
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.className = "w-full py-3.5 bg-slate-800 text-slate-500 font-bold text-sm rounded-2xl flex items-center justify-center space-x-2 transition-all";
+    }
+
+    function renderCapsules() {
+      const list = document.getElementById('capsule-list');
+      if (!list) return;
+      if (capsules.length === 0) {
+        list.innerHTML = `<p class="text-center text-xs text-slate-500 py-8">現在セットされているカプセルはありません。</p>`;
+        return;
+      }
+
+      list.innerHTML = capsules.map(c => `
+        <div class="p-4 bg-[#1E293B] rounded-2xl border border-slate-700/60 flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-[#4C1D95] flex items-center justify-center text-white">
+              <i class="fa-solid fa-phone-incoming text-sm"></i>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-white">${c.senderName}</p>
+              <p class="text-xs text-slate-400">着信予定: ${c.targetTime.getFullYear()}/${c.targetTime.getMonth()+1}/${c.targetTime.getDate()} ${String(c.targetTime.getHours()).padStart(2,'0')}:${String(c.targetTime.getMinutes()).padStart(2,'0')}</p>
+            </div>
+          </div>
+          <button type="button" onclick="deleteCapsule(${c.id})" class="text-slate-500 hover:text-red-400 p-2">
+            <i class="fa-regular fa-trash-can"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function deleteCapsule(id) {
+      capsules = capsules.filter(c => c.id !== id);
+      renderCapsules();
+    }
+
+    function triggerIncomingCall(capsule) {
+      document.getElementById('call-sender-name').innerText = capsule.senderName;
+      document.getElementById('call-status-text').innerText = "未来からの着信...";
+      document.getElementById('accept-call-btn').classList.remove('hidden');
+      document.getElementById('call-overlay').classList.remove('hidden');
+    }
+
+    function acceptCall() {
+      document.getElementById('accept-call-btn').classList.add('hidden');
+      document.getElementById('call-status-text').innerText = "通話中: 00:00";
+      callSeconds = 0;
+      callTimerInterval = setInterval(() => {
+        callSeconds++;
+        const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+        const secs = String(callSeconds % 60).padStart(2, '0');
+        document.getElementById('call-status-text').innerText = `通話中: ${mins}:${secs}`;
+      }, 1000);
+
+      if (audioUrl) {
+        audioPlayer.src = audioUrl;
+        audioPlayer.play().catch(e => console.warn(e));
+      }
+    }
+
+    function endCall() {
+      clearInterval(callTimerInterval);
+      audioPlayer.pause();
+      document.getElementById('call-overlay').classList.add('hidden');
+    }
+
     function switchTab(tab) {
       const screenRecord = document.getElementById('screen-record');
       const screenHistory = document.getElementById('screen-history');
@@ -185,199 +366,6 @@
         navRecord.className = 'flex flex-col items-center space-y-1 text-slate-400';
         navHistory.className = 'flex flex-col items-center space-y-1 text-[#A78BFA]';
       }
-    }
-
-    // 録音コントロール（Pixel 7 Pro等の高音質・ノイズキャンセリング制御対応）
-    async function toggleRecording() {
-      const micBtn = document.getElementById('mic-btn');
-      const micIcon = document.getElementById('mic-icon');
-      const micStatus = document.getElementById('mic-status');
-      const previewBtn = document.getElementById('preview-btn');
-
-      if (!isRecording) {
-        try {
-          // Pixel等の多重マイク性能を活かすオーディオ設定
-          const constraints = {
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-              sampleRate: 44100
-            }
-          };
-          const stream = await navigator.mediaDevices.getUserMedia(constraints);
-          mediaRecorder = new MediaRecorder(stream);
-          audioChunks = [];
-
-          mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
-          mediaRecorder.onstop = () => {
-            recordedAudioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
-            audioUrl = URL.createObjectURL(recordedAudioBlob);
-            previewBtn.classList.remove('hidden');
-            enableSubmitButton();
-          };
-
-          mediaRecorder.start();
-          isRecording = true;
-          micBtn.className = "w-20 h-20 rounded-full bg-red-500 text-white flex items-center justify-center mx-auto pulse-animation";
-          micIcon.className = "fa-solid fa-square text-2xl";
-          micStatus.innerText = "録音中... もう一度押して完了";
-        } catch (err) {
-          recordedAudioBlob = new Blob();
-          enableSubmitButton();
-          previewBtn.classList.remove('hidden');
-        }
-      } else {
-        if (mediaRecorder && mediaRecorder.state !== "inactive") {
-          mediaRecorder.stop();
-        }
-        isRecording = false;
-        micBtn.className = "w-20 h-20 rounded-full bg-[#7C3AED] text-white flex items-center justify-center mx-auto shadow-lg shadow-[#7C3AED]/40";
-        micIcon.className = "fa-solid fa-microphone text-2xl";
-        micStatus.innerText = "録音完了！";
-      }
-    }
-
-    // プレビュー再生
-    function playPreview() {
-      const previewIcon = document.getElementById('preview-icon');
-      const previewText = document.getElementById('preview-text');
-
-      if (!audioPlayer.paused) {
-        audioPlayer.pause();
-        previewIcon.className = "fa-solid fa-play";
-        previewText.innerText = "録音プレビュー再生";
-      } else if (audioUrl) {
-        audioPlayer.src = audioUrl;
-        audioPlayer.play();
-        previewIcon.className = "fa-solid fa-pause";
-        previewText.innerText = "停止";
-        audioPlayer.onended = () => {
-          previewIcon.className = "fa-solid fa-play";
-          previewText.innerText = "録音プレビュー再生";
-        };
-      }
-    }
-
-    // ボタン有効化
-    function enableSubmitButton() {
-      const btn = document.getElementById('submit-btn');
-      btn.disabled = false;
-      btn.className = "w-full py-3.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-sm rounded-2xl flex items-center justify-center space-x-2 transition-all shadow-lg shadow-[#7C3AED]/30";
-    }
-
-    // 保存処理
-    function saveCapsule() {
-      const senderName = document.getElementById('sender-input').value.trim() || '過去の自分';
-      const targetTimeVal = document.getElementById('datetime-input').value;
-      
-      if (!targetTimeVal) return;
-      
-      const targetTime = new Date(targetTimeVal);
-      const delayMs = targetTime.getTime() - Date.now();
-
-      const capsule = {
-        id: Date.now(),
-        senderName: senderName,
-        targetTime: targetTime,
-        audioUrl: audioUrl,
-        isCalled: false
-      };
-
-      capsules.push(capsule);
-      renderCapsules();
-
-      // 指定ミリ秒後に着信を発火
-      if (delayMs > 0) {
-        setTimeout(() => {
-          triggerIncomingCall(capsule);
-        }, delayMs);
-      }
-
-      // リセット
-      audioUrl = null;
-      document.getElementById('preview-btn').classList.add('hidden');
-      document.getElementById('mic-status').innerText = "マイクボタンを押して録音開始";
-      const btn = document.getElementById('submit-btn');
-      btn.disabled = true;
-      btn.className = "w-full py-3.5 bg-slate-800 text-slate-500 font-bold text-sm rounded-2xl flex items-center justify-center space-x-2 transition-all";
-    }
-
-    // 履歴レンダリング
-    function renderCapsules() {
-      const list = document.getElementById('capsule-list');
-      if (capsules.length === 0) {
-        list.innerHTML = `<p class="text-center text-xs text-slate-500 py-8">現在セットされているカプセルはありません。</p>`;
-        return;
-      }
-
-      list.innerHTML = capsules.map(c => `
-        <div class="p-4 bg-[#1E293B] rounded-2xl border border-slate-700/60 flex items-center justify-between">
-          <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-full bg-[#4C1D95] flex items-center justify-center text-white">
-              <i class="fa-solid fa-phone-incoming text-sm"></i>
-            </div>
-            <div>
-              <p class="text-sm font-bold text-white">${c.senderName}</p>
-              <p class="text-xs text-slate-400">着信予定: ${c.targetTime.getFullYear()}/${c.targetTime.getMonth()+1}/${c.targetTime.getDate()} ${String(c.targetTime.getHours()).padStart(2,'0')}:${String(c.targetTime.getMinutes()).padStart(2,'0')}</p>
-            </div>
-          </div>
-          <button onclick="deleteCapsule(${c.id})" class="text-slate-500 hover:text-red-400 p-2">
-            <i class="fa-regular fa-trash-can"></i>
-          </button>
-        </div>
-      `).join('');
-    }
-
-    // 削除
-    function deleteCapsule(id) {
-      capsules = capsules.filter(c => c.id !== id);
-      renderCapsules();
-    }
-
-    // 電話着信画面起動
-    function triggerIncomingCall(capsule) {
-      document.getElementById('call-sender-name').innerText = capsule.senderName;
-      document.getElementById('call-status-text').innerText = "未来からの着信...";
-      document.getElementById('accept-call-btn').classList.remove('hidden');
-      document.getElementById('call-overlay').classList.remove('hidden');
-    }
-
-    // 電話に応答（受話スピーカー出力指定対応）
-    function acceptCall() {
-      document.getElementById('accept-call-btn').classList.add('hidden');
-      document.getElementById('call-status-text').innerText = "通話中: 00:00";
-      
-      callSeconds = 0;
-      callTimerInterval = setInterval(() => {
-        callSeconds++;
-        const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
-        const secs = String(callSeconds % 60).padStart(2, '0');
-        document.getElementById('call-status-text').innerText = `通話中: ${mins}:${secs}`;
-      }, 1000);
-
-      if (audioUrl) {
-        audioPlayer.src = audioUrl;
-        
-        // 受話口（Earpiece）へ音声出力先を切り替える指定
-        if (typeof audioPlayer.setSinkId === 'function') {
-          navigator.mediaDevices.enumerateDevices().then(devices => {
-            const earpiece = devices.find(device => device.kind === 'audiooutput' && device.deviceId.includes('earpiece'));
-            if (earpiece) {
-              audioPlayer.setSinkId(earpiece.deviceId);
-            }
-          }).catch(() => {});
-        }
-        
-        audioPlayer.play();
-      }
-    }
-
-    // 通話終了
-    function endCall() {
-      clearInterval(callTimerInterval);
-      audioPlayer.pause();
-      document.getElementById('call-overlay').classList.add('hidden');
     }
   </script>
 </body>
