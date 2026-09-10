@@ -1,0 +1,18 @@
+<?xml class='1.0' encoding='utf-8'?>
+<widget id="com.ourie.app" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0" xmlns:android="http://schemas.android.com/apk/res/android">
+    <name>Ourie</name>
+    <description>Ourie Time Capsule Voice Call App</description>
+    <author email="dev@example.com">Ourie Dev</author>
+    <content src="index.html" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+
+    <!-- アプリアイコン設定 -->
+    <icon src="www/icon.png" />
+
+    <!-- Pixel 7 Pro向けマイク・オーディオ設定 -->
+    <config-file target="AndroidManifest.xml" parent="/*">
+        <uses-permission android:name="android.permission.RECORD_AUDIO" />
+        <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    </config-file>
+</widget>
