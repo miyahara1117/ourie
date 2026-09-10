@@ -1,0 +1,48 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Cordova
+        run: npm install -g cordova
+
+      - name: Create Cordova Project
+        run: |
+          cordova create build_app com.ourie.app Ourie
+          rm -rf build_app/www
+          cp -r www build_app/www
+
+      - name: Add Android Platform
+        run: |
+          cd build_app
+          cordova platform add android
+
+      - name: Build APK
+        run: |
+          cd build_app
+          cordova build android --debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug.apk
+          path: build_app/platforms/android/app/build/outputs/apk/debug/app-debug.apk
