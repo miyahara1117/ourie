@@ -34,32 +34,41 @@ jobs:
       - name: Add Android platform
         run: npx cap add android || true
 
-      - name: Copy Custom App Icon to Android
+      - name: Force Custom App Icon
         run: |
           mkdir -p android/app/src/main/res/mipmap-hdpi
           mkdir -p android/app/src/main/res/mipmap-mdpi
           mkdir -p android/app/src/main/res/mipmap-xhdpi
           mkdir -p android/app/src/main/res/mipmap-xxhdpi
           mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-      
+
+          # Remove Android 8+ Adaptive Icon XMLs that override PNG icons
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26/ic_launcher*.xml || true
+
           ICON_FILE=""
-          if [ -f "www/icon.png" ]; then
-            ICON_FILE="www/icon.png"
-          elif [ -f "www/icon.jpg" ]; then
-            ICON_FILE="www/icon.jpg"
-          fi
-      
+          for f in "www/icon.png" "www/icon.jpg" "icon.png" "icon.jpg" "icon_3.jpg" "www/icon_3.jpg"; do
+            if [ -f "$f" ]; then
+              ICON_FILE="$f"
+              break
+            fi
+          done
+
           if [ -n "$ICON_FILE" ]; then
+            echo "Applying icon from: $ICON_FILE"
             cp "$ICON_FILE" android/app/src/main/res/mipmap-hdpi/ic_launcher.png
             cp "$ICON_FILE" android/app/src/main/res/mipmap-mdpi/ic_launcher.png
             cp "$ICON_FILE" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
             cp "$ICON_FILE" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
             cp "$ICON_FILE" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
             cp "$ICON_FILE" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
             cp "$ICON_FILE" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
             cp "$ICON_FILE" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
             cp "$ICON_FILE" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
             cp "$ICON_FILE" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+
+            mkdir -p www
+            cp "$ICON_FILE" www/icon.png
           fi
 
       - name: Add microphone permission
