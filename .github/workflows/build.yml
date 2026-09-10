@@ -31,6 +31,7 @@ jobs:
           rm -rf build_app/www
           cp -r www build_app/www
           sed -i '/<\/widget>/i \    <icon src="www/icon.png" />' build_app/config.xml
+          sed -i '/<\/widget>/i \    <config-file target="AndroidManifest.xml" parent="/*"><uses-permission android:name="android.permission.RECORD_AUDIO" /><uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" /></config-file>' build_app/config.xml
 
       - name: Add Android Platform
         run: |
