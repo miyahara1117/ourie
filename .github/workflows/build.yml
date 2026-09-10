@@ -22,30 +22,24 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Cordova
-        run: npm install -g cordova
-
-      - name: Create Cordova Project
+      - name: Install Capacitor & Dependencies
         run: |
-          cordova create build_app com.ourie.app Ourie
-          rm -rf build_app/www
-          cp -r www build_app/www
-          cp config.xml build_app/config.xml
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      - name: Add Android Platform
+      - name: Initialize Capacitor Project
         run: |
-          cd build_app
-          cordova platform add android
+          npx cap init Ourie com.ourie.app --web-dir www
+          npx cap add android
 
-      - name: Build APK
+      - name: Build Android App with Gradle
         run: |
-          cd build_app
-          cordova build android --debug
-          mkdir -p ../output
-          find . -name "*.apk" -exec cp {} ../output/ \;
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: output/*.apk
+          name: app-debug.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk－
