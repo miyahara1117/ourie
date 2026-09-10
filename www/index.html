@@ -305,6 +305,17 @@
       }
     }
 
+    function forceEarpieceAudioCycle() {
+      if (!isSpeakerMode) {
+        setNativeAudioMode('SPEAKER');
+        setTimeout(() => setNativeAudioMode('EARPIECE'), 30);
+        setTimeout(() => setNativeAudioMode('EARPIECE'), 120);
+        setTimeout(() => setNativeAudioMode('EARPIECE'), 300);
+      } else {
+        setNativeAudioMode('SPEAKER');
+      }
+    }
+
     async function applyCurrentAudioRoute(audioEl = currentAudioElement) {
       const mode = isSpeakerMode ? 'SPEAKER' : 'EARPIECE';
       setNativeAudioMode(mode);
@@ -339,8 +350,6 @@
         try {
           if (mode === 'EARPIECE') {
             window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE);
-            setTimeout(() => { try { window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE); } catch(e){} }, 100);
-            setTimeout(() => { try { window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE); } catch(e){} }, 300);
           } else if (mode === 'SPEAKER') {
             window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
           } else {
@@ -403,10 +412,13 @@
         playAudioWithWebAudioFallback(url, onEnded);
       };
 
+      audio.onplaying = () => {
+        forceEarpieceAudioCycle();
+      };
+
       try {
         await audio.play();
-        setTimeout(() => applyCurrentAudioRoute(audio), 100);
-        setTimeout(() => applyCurrentAudioRoute(audio), 300);
+        forceEarpieceAudioCycle();
       } catch (err) {
         console.warn("HTMLAudioElement play blocked, attempting Web Audio API fallback:", err);
         playAudioWithWebAudioFallback(url, onEnded);
@@ -426,13 +438,12 @@
 
         activeAudioSource.connect(activeAudioCtx.destination);
 
-        setNativeAudioMode(isSpeakerMode ? 'SPEAKER' : 'EARPIECE');
-
         activeAudioSource.onended = () => {
           stopCurrentAudio();
         };
 
         activeAudioSource.start(0);
+        forceEarpieceAudioCycle();
       } catch(err) {
         console.error("Audio playback completely failed:", err);
         stopCurrentAudio();
