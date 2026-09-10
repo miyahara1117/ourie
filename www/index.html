@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ourie</title>
   <!-- Chosen Palette: Slate & Purple Night Theme -->
-  <!-- Application Structure Plan: Single-page interactive phone application allowing users to record voice messages for the future, set call schedules, respond during simulated incoming calls, and toggle between earpiece receiver and loudspeaker during active calls using native audio toggle API. -->
-  <!-- Visualization & Content Choices: Clean Tailwind layout with HTML/CSS interactive components, HTML Audio API player handling, call screen overlay, and Cordova AudioToggle routing integration. CONFIRMING: NO SVG, NO Mermaid JS. -->
+  <!-- Application Structure Plan: Single-page interactive phone application allowing users to record voice messages for the future, set call schedules, respond during simulated incoming calls, and toggle between earpiece receiver and loudspeaker during active calls and playbacks using native audio toggle API. -->
+  <!-- Visualization & Content Choices: Clean Tailwind layout with HTML/CSS interactive components, HTML Audio API player handling, call screen overlay, and Cordova AudioToggle routing integration for all audio playbacks including previews and call responses. CONFIRMING: NO SVG, NO Mermaid JS. -->
   <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -51,11 +51,11 @@
         <!-- 説明バナー -->
         <div class="p-4 rounded-2xl bg-gradient-to-r from-[#4C1D95]/50 to-[#1E293B] border border-[#7C3AED]/30 space-y-1.5">
           <div class="flex items-center space-x-1.5 text-[#A78BFA] text-xs font-bold">
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
-            <span>未来にあなたの声を送ります</span>
+            <i class="fa-solid fa-ear-listen"></i>
+            <span>耳あて通話スピーカー対応</span>
           </div>
           <p class="text-xs text-slate-300 leading-relaxed">
-            指定した日時に過去から電話がかかってきます。<br>耳に受話器をあてて会話を思い出に残しましょう。
+            プレビュー再生や着信時の通話音声はすべてスマホ上部の耳あて受話器から流れます。
           </p>
         </div>
 
@@ -75,8 +75,8 @@
           <p id="mic-status" class="text-xs text-slate-300 leading-normal">マイクボタンを押して録音開始</p>
 
           <button id="preview-btn" type="button" onclick="playPreview()" class="hidden mx-auto px-4 py-2 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-2">
-            <i id="preview-icon" class="fa-solid fa-play"></i>
-            <span id="preview-text">録音プレビュー再生</span>
+            <i id="preview-icon" class="fa-solid fa-ear-listen"></i>
+            <span id="preview-text">受話器で確認再生</span>
           </button>
         </div>
 
@@ -151,7 +151,7 @@
           </button>
 
           <button id="reply-play-btn" type="button" onclick="playReplyPreview()" class="hidden px-3 py-2 bg-slate-800 text-purple-300 text-xs rounded-xl flex items-center space-x-1 border border-purple-500/30">
-            <i id="reply-play-icon" class="fa-solid fa-play text-xs"></i>
+            <i id="reply-play-icon" class="fa-solid fa-ear-listen text-xs"></i>
             <span id="reply-play-text">確認</span>
           </button>
         </div>
@@ -340,17 +340,18 @@
 
       if (!audioPlayer.paused) {
         audioPlayer.pause();
-        previewIcon.className = "fa-solid fa-play";
-        previewText.innerText = "録音プレビュー再生";
+        previewIcon.className = "fa-solid fa-ear-listen";
+        previewText.innerText = "受話器で確認再生";
       } else if (audioUrl) {
-        setNativeAudioMode('NORMAL');
+        setNativeAudioMode('EARPIECE');
         audioPlayer.src = audioUrl;
         audioPlayer.play().catch(e => console.warn(e));
         previewIcon.className = "fa-solid fa-pause";
         previewText.innerText = "停止";
         audioPlayer.onended = () => {
-          previewIcon.className = "fa-solid fa-play";
-          previewText.innerText = "録音プレビュー再生";
+          previewIcon.className = "fa-solid fa-ear-listen";
+          previewText.innerText = "受話器で確認再生";
+          setNativeAudioMode('NORMAL');
         };
       }
     }
@@ -423,13 +424,13 @@
 
           <div class="flex items-center space-x-2 pt-1 border-t border-slate-800">
             <button type="button" onclick="playSavedAudio('${c.audioUrl}')" class="px-3 py-1.5 bg-[#4C1D95] text-white text-xs rounded-xl flex items-center space-x-1.5">
-              <i class="fa-solid fa-play text-[10px]"></i>
-              <span>メッセージ再生</span>
+              <i class="fa-solid fa-ear-listen text-[10px]"></i>
+              <span>受話器で聴く</span>
             </button>
             ${c.replyAudioUrl ? `
               <button type="button" onclick="playSavedAudio('${c.replyAudioUrl}')" class="px-3 py-1.5 bg-emerald-700 text-white text-xs rounded-xl flex items-center space-x-1.5">
-                <i class="fa-solid fa-reply text-[10px]"></i>
-                <span>当時の返答を聞く</span>
+                <i class="fa-solid fa-ear-listen text-[10px]"></i>
+                <span>当時の返答を聴く</span>
               </button>
             ` : '<span class="text-[10px] text-slate-500">返答なし</span>'}
           </div>
@@ -439,9 +440,12 @@
 
     function playSavedAudio(url) {
       if (!url) return;
-      setNativeAudioMode('NORMAL');
+      setNativeAudioMode('EARPIECE');
       audioPlayer.src = url;
       audioPlayer.play().catch(e => console.warn(e));
+      audioPlayer.onended = () => {
+        setNativeAudioMode('NORMAL');
+      };
     }
 
     function deleteCapsule(id) {
@@ -622,16 +626,22 @@
 
       if (!replyPlayer.paused) {
         replyPlayer.pause();
-        icon.className = "fa-solid fa-play text-xs";
+        icon.className = "fa-solid fa-ear-listen text-xs";
         text.innerText = "確認";
       } else if (replyAudioUrl) {
+        if (!isLoudspeaker) {
+          setNativeAudioMode('EARPIECE');
+        }
         replyPlayer.src = replyAudioUrl;
         replyPlayer.play().catch(e => console.warn(e));
         icon.className = "fa-solid fa-pause text-xs";
         text.innerText = "停止";
         replyPlayer.onended = () => {
-          icon.className = "fa-solid fa-play text-xs";
+          icon.className = "fa-solid fa-ear-listen text-xs";
           text.innerText = "確認";
+          if (!isLoudspeaker) {
+            setNativeAudioMode('EARPIECE');
+          }
         };
       }
     }
