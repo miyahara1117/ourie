@@ -26,17 +26,30 @@ uses: actions/checkout@v4
   - name: Android SDK セットアップ
     uses: android-actions/setup-android@v3
 
-  - name: 依存関係のインストール & プラットフォーム追加
-    run: |
-      npm install
-      npx cap add android
+  - name: 依存関係のインストール
+    run: npm install
 
-  - name: AndroidManifestにマイク・音声権限を追加
+  - name: Capacitor Androidプラットフォーム追加
     run: |
-      sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-feature android:name="android.hardware.microphone" android:required="true" />' android/app/src/main/AndroidManifest.xml
+      if [ ! -d "android" ]; then
+        npx cap add android
+      fi
 
-  - name: MainActivityにアプリ起動時のマイク権限ダイアログ表示コードを自動注入
+  - name: マイク権限・MainActivity設定を注入
     run: |
+      # AndroidManifest.xml にマイク権限を追加
+      python3 -c "
+      manifest_path = 'android/app/src/main/AndroidManifest.xml'
+      with open(manifest_path, 'r', encoding='utf-8') as f:
+          content = f.read()
+      perms = '    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />\n    <uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\" />\n    <uses-feature android:name=\"android.hardware.microphone\" android:required=\"true\" />\n'
+      if 'RECORD_AUDIO' not in content:
+          content = content.replace('</manifest>', perms + '</manifest>')
+          with open(manifest_path, 'w', encoding='utf-8') as f:
+              f.write(content)
+      "
+      # MainActivity ディレクトリの確実な作成 & コード注入
+      mkdir -p android/app/src/main/java/com/ourie/timecapsule
       cat << 'EOF' > android/app/src/main/java/com/ourie/timecapsule/MainActivity.java
       package com.ourie.timecapsule;
 
