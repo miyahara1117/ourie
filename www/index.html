@@ -8,8 +8,8 @@
   <link rel="icon" id="app-favicon" href="icon.png" type="image/png">
   <link rel="apple-touch-icon" href="icon.png">
   <!-- Chosen Palette: Slate & Purple Night Theme -->
-  <!-- Application Structure Plan: Single-page interactive phone time-capsule app ensuring precise audio output routing (Earpiece by default vs Loudspeaker override) using HTML5 Audio, Web Audio API fallback, setSinkId API, and native AudioToggle integration without accidental playback stops during toggle. -->
-  <!-- Visualization & Content Choices: Tailwind responsive UI, FontAwesome icons, Web Audio API + HTML5 Audio + AudioToggle routing. CONFIRMING: NO SVG, NO Mermaid JS. -->
+  <!-- Application Structure Plan: Single-page interactive phone time-capsule app with user profile customization (Avatar & Name), dynamic incoming call overlay resembling phone call UI, and reliable audio output routing. -->
+  <!-- Visualization & Content Choices: Tailwind responsive UI, FontAwesome icons, Base64 image storage via FileReader, Web Audio API + HTML5 Audio + AudioToggle routing. CONFIRMING: NO SVG, NO Mermaid JS. -->
   <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -47,10 +47,10 @@
     <!-- Header Audio Output Bar (Global Toggle) -->
     <div class="bg-slate-900/90 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between z-20">
       <div class="flex items-center space-x-2">
-        <div class="w-7 h-7 rounded-lg overflow-hidden bg-slate-800 flex items-center justify-center border border-purple-400/30">
-          <img src="icon.png" alt="Ourie" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
+        <div id="header-avatar-container" class="w-7 h-7 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center border border-purple-400/30">
+          <img id="header-avatar-img" src="icon.png" alt="Ourie Profile" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
         </div>
-        <span class="text-xs font-bold tracking-wide text-white">Ourie</span>
+        <span class="text-xs font-bold tracking-wide text-white" id="header-user-name">Ourie</span>
       </div>
 
       <!-- Global Audio Output Toggle Button -->
@@ -64,7 +64,7 @@
     <!-- Main Content Container -->
     <div id="app-content" class="flex-1 overflow-y-auto p-4 pb-20">
       
-      <!-- Screen 1: Capsule Creation -->
+      <!-- Screen 1: Capsule Creation & Profile Setup -->
       <div id="screen-record" class="block space-y-4">
         
         <!-- Audio Output Mode Info Banner -->
@@ -80,11 +80,43 @@
           </p>
         </div>
 
-        <!-- Sender Name Input -->
+        <!-- Profile Settings Card -->
+        <div class="p-3.5 bg-[#1E293B]/90 rounded-2xl border border-purple-500/30 space-y-3 shadow-md">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-purple-200 flex items-center space-x-1.5">
+              <i class="fa-solid fa-id-card text-[#A78BFA]"></i>
+              <span>自分のプロフィール設定</span>
+            </span>
+            <span class="text-[10px] text-slate-400">着信画面に反映されます</span>
+          </div>
+
+          <div class="flex items-center space-x-3 pt-1">
+            <!-- Avatar Upload Circle -->
+            <div class="relative group cursor-pointer" onclick="document.getElementById('avatar-file-input').click()">
+              <div class="w-14 h-14 rounded-full overflow-hidden bg-slate-800 border-2 border-purple-400/60 shadow-lg flex items-center justify-center">
+                <img id="profile-avatar-preview" src="icon.png" alt="Profile Avatar" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
+              </div>
+              <div class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
+                <i class="fa-solid fa-camera text-white text-xs"></i>
+              </div>
+              <input id="avatar-file-input" type="file" accept="image/*" class="hidden" onchange="handleAvatarUpload(event)">
+            </div>
+
+            <!-- Profile Name Input -->
+            <div class="flex-1 space-y-1">
+              <label class="text-[11px] text-slate-300 font-medium">表示名（発信者名）</label>
+              <input id="profile-name-input" type="text" value="過去の自分" placeholder="例: 1年前の自分、コン" 
+                oninput="handleNameChange(this.value)"
+                class="w-full bg-slate-900/80 text-xs text-white px-3 py-2 rounded-xl border border-slate-700 focus:outline-none focus:ring-1 focus:ring-[#7C3AED]">
+            </div>
+          </div>
+        </div>
+
+        <!-- Sender Name Input for Capsule (Synced with Profile) -->
         <div class="space-y-1">
           <label class="text-xs text-slate-300 font-medium flex items-center space-x-1">
             <i class="fa-regular fa-user text-[11px] text-[#A78BFA]"></i>
-            <span>着信時の発信者名</span>
+            <span>今回着信させる表示名</span>
           </label>
           <input id="sender-input" type="text" value="過去の自分" placeholder="例: 1年前の自分、ハタチの俺" 
             class="w-full bg-[#1E293B] text-sm text-white px-4 py-2.5 rounded-2xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]">
@@ -161,21 +193,25 @@
       </button>
     </div>
 
-    <!-- Incoming Call Overlay Screen -->
-    <div id="call-overlay" class="hidden absolute inset-0 bg-black z-50 p-6 flex flex-col justify-between items-center text-center">
-      <div class="mt-8 space-y-3 w-full">
-        <div class="w-20 h-20 rounded-full overflow-hidden border-2 border-purple-400/50 flex items-center justify-center mx-auto shadow-2xl shadow-indigo-500/30 bg-slate-800">
-          <img src="icon.png" alt="Caller Icon" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
+    <!-- Incoming Call Overlay Screen (LINE Call Styled UI) -->
+    <div id="call-overlay" class="hidden absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-black z-50 p-6 flex flex-col justify-between items-center text-center">
+      
+      <!-- Top Call Header / Profile Info -->
+      <div class="mt-12 space-y-4 w-full flex flex-col items-center">
+        <!-- Large Rounded Profile Avatar Frame -->
+        <div class="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 border-purple-400/40 shadow-2xl shadow-indigo-500/30 bg-slate-800 flex items-center justify-center">
+          <img id="call-avatar-img" src="icon.png" alt="Caller Avatar" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
         </div>
+        
         <div>
-          <h3 id="call-sender-name" class="text-xl font-bold text-white">過去の自分</h3>
-          <p id="call-status-text" class="text-xs text-[#A78BFA] mt-1 font-medium">未来からの着信...</p>
+          <h3 id="call-sender-name" class="text-2xl font-bold text-white tracking-wide">過去の自分</h3>
+          <p id="call-status-text" class="text-xs text-[#A78BFA] mt-1.5 font-medium tracking-wider">未来からの着信...</p>
         </div>
 
         <!-- Speaker Output Toggle Button (Call Screen) -->
-        <div id="speaker-toggle-container" class="hidden pt-2">
+        <div id="speaker-toggle-container" class="hidden pt-1">
           <button id="speaker-toggle-btn" type="button" onclick="toggleGlobalSpeakerMode()" 
-            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 text-xs font-semibold rounded-full border border-purple-500/40 inline-flex items-center space-x-2 shadow-md transition-all active:scale-95 cursor-pointer">
+            class="px-4 py-2 bg-slate-800/90 hover:bg-slate-700 text-purple-300 text-xs font-semibold rounded-full border border-purple-500/40 inline-flex items-center space-x-2 shadow-md transition-all active:scale-95 cursor-pointer">
             <i id="call-speaker-icon" class="fa-solid fa-phone-volume text-sm"></i>
             <span id="call-speaker-text">受話器（耳あて）モード</span>
           </button>
@@ -204,7 +240,7 @@
       </div>
 
       <!-- Call Action Buttons -->
-      <div class="mb-8 flex justify-center items-center space-x-12 w-full">
+      <div class="mb-10 flex justify-center items-center space-x-12 w-full">
         <button id="end-call-btn" type="button" onclick="endCall()" class="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/40 active:scale-95 transition-all cursor-pointer">
           <i class="fa-solid fa-phone-slash text-2xl"></i>
         </button>
@@ -237,6 +273,10 @@
     let replyAudioBlob = null;
     let replyAudioUrl = null;
 
+    // Profile Data (Saved in LocalStorage)
+    let userAvatarData = null; // Base64 or URL
+    let userName = "過去の自分";
+
     // Default Audio Mode: EARPIECE (通話受話器 / 耳あて)
     let isSpeakerMode = false;
 
@@ -248,6 +288,21 @@
     let currentOnEndedHandler = null;
 
     window.onload = () => {
+      // Load stored profile
+      const savedAvatar = localStorage.getItem('ourie_user_avatar');
+      const savedName = localStorage.getItem('ourie_user_name');
+      
+      if (savedAvatar) {
+        userAvatarData = savedAvatar;
+        updateAvatarDisplay(userAvatarData);
+      }
+      if (savedName) {
+        userName = savedName;
+        document.getElementById('profile-name-input').value = userName;
+        document.getElementById('sender-input').value = userName;
+        document.getElementById('header-user-name').innerText = userName;
+      }
+
       const now = new Date();
       now.setMinutes(now.getMinutes() + 1);
       const localDatetime = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
@@ -256,6 +311,37 @@
       renderCapsules();
       updateSpeakerUI();
     };
+
+    function handleAvatarUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        userAvatarData = e.target.result;
+        localStorage.setItem('ourie_user_avatar', userAvatarData);
+        updateAvatarDisplay(userAvatarData);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function updateAvatarDisplay(avatarSrc) {
+      if (!avatarSrc) return;
+      const previewImg = document.getElementById('profile-avatar-preview');
+      const headerImg = document.getElementById('header-avatar-img');
+      const callAvatarImg = document.getElementById('call-avatar-img');
+
+      if (previewImg) previewImg.src = avatarSrc;
+      if (headerImg) headerImg.src = avatarSrc;
+      if (callAvatarImg) callAvatarImg.src = avatarSrc;
+    }
+
+    function handleNameChange(val) {
+      userName = val.trim() || '過去の自分';
+      localStorage.setItem('ourie_user_name', userName);
+      document.getElementById('sender-input').value = userName;
+      document.getElementById('header-user-name').innerText = userName;
+    }
 
     function toggleGlobalSpeakerMode() {
       isSpeakerMode = !isSpeakerMode;
@@ -608,6 +694,7 @@
       const capsule = {
         id: Date.now(),
         senderName: senderName,
+        senderAvatar: userAvatarData,
         targetTime: targetTime,
         audioUrl: audioUrl,
         replyAudioUrl: null
@@ -651,8 +738,8 @@
         <div class="p-4 bg-[#1E293B] rounded-2xl border border-slate-700/60 space-y-3 shadow-md">
           <div class="flex items-center justify-between">
             <div class="flex items-center space-x-3">
-              <div class="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 flex items-center justify-center text-white shadow-md border border-purple-500/30">
-                <img src="icon.png" alt="Icon" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
+              <div class="w-10 h-10 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center text-white shadow-md border border-purple-500/30">
+                <img src="${c.senderAvatar || 'icon.png'}" alt="Icon" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
               </div>
               <div>
                 <p class="text-sm font-bold text-white">${c.senderName}</p>
@@ -744,6 +831,12 @@
 
       document.getElementById('call-sender-name').innerText = capsule.senderName;
       document.getElementById('call-status-text').innerText = "未来からの着信...";
+      
+      const callAvatarImg = document.getElementById('call-avatar-img');
+      if (callAvatarImg) {
+        callAvatarImg.src = capsule.senderAvatar || userAvatarData || 'icon.png';
+      }
+
       document.getElementById('accept-call-btn').classList.remove('hidden');
       document.getElementById('reply-area').classList.add('hidden');
       document.getElementById('speaker-toggle-container').classList.add('hidden');
