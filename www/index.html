@@ -142,14 +142,35 @@
           </button>
         </div>
 
-        <!-- Friend ID Input Container -->
-        <div id="friend-id-container" class="hidden pt-1.5 space-y-1">
-          <label class="text-xs text-slate-300 font-medium block">お届け先の相手の Ourie ID</label>
-          <div class="relative">
-            <input id="friend-id-input" type="text" placeholder="例: OU-8392" 
-              class="w-full bg-slate-900/90 text-sm text-white px-3 py-2.5 rounded-xl border border-purple-500/50 uppercase tracking-widest font-mono focus:outline-none focus:ring-1 focus:ring-purple-500">
+        <!-- Friend Selector & Management Container -->
+        <div id="friend-id-container" class="hidden pt-1.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="text-xs text-slate-300 font-medium block">お届け先の友達を選択</label>
+            <button type="button" onclick="openAddFriendModal()" class="text-[11px] text-purple-300 hover:text-purple-200 bg-purple-950/70 border border-purple-500/40 px-2 py-0.5 rounded-lg flex items-center space-x-1 transition active:scale-95">
+              <i class="fa-solid fa-user-plus text-[10px]"></i>
+              <span>友達を追加</span>
+            </button>
           </div>
-          <p class="text-[11px] text-slate-400">※ お相手のOurieアプリに表示されているIDを入力してください</p>
+
+          <!-- Quick Select Friends List (Horizontal Scroll) -->
+          <div id="friends-chip-list" class="flex space-x-2 overflow-x-auto pb-1 pt-0.5 custom-scrollbar min-h-[48px] items-center">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- Selected Friend or Direct ID Input -->
+          <div class="space-y-1 pt-1">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span id="selected-friend-label">直接ID入力 または 上の友達を選択</span>
+              <button id="clear-selected-friend-btn" type="button" onclick="clearSelectedFriend()" class="hidden text-slate-400 hover:text-red-400 text-[10px]">
+                選択解除
+              </button>
+            </div>
+            <div class="relative">
+              <input id="friend-id-input" type="text" placeholder="例: OU-8392" 
+                class="w-full bg-slate-900/90 text-sm text-white px-3 py-2.5 rounded-xl border border-purple-500/50 uppercase tracking-widest font-mono focus:outline-none focus:ring-1 focus:ring-purple-500">
+            </div>
+            <p class="text-[11px] text-slate-400">※ お相手のOurieアプリに表示されているIDを入力または選択してください</p>
+          </div>
         </div>
       </div>
 
@@ -397,6 +418,43 @@
     </div>
   </div>
 
+  <!-- Add Friend Modal -->
+  <div id="add-friend-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-[#1E293B] border border-purple-500/40 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between pb-1 border-b border-slate-700">
+        <h3 class="text-sm font-bold text-white flex items-center space-x-1.5">
+          <i class="fa-solid fa-user-plus text-purple-400"></i>
+          <span>友達を登録する</span>
+        </h3>
+        <button type="button" onclick="closeAddFriendModal()" class="w-7 h-7 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div class="space-y-1">
+          <label class="text-xs text-slate-300 font-medium block">お名前（ニックネーム）</label>
+          <input id="new-friend-name" type="text" placeholder="例: たくや、みほ" 
+            class="w-full bg-slate-900/90 text-sm text-white px-3 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:ring-1 focus:ring-purple-500">
+        </div>
+        <div class="space-y-1">
+          <label class="text-xs text-slate-300 font-medium block">お相手の Ourie ID</label>
+          <input id="new-friend-id" type="text" placeholder="例: OU-1234" 
+            class="w-full bg-slate-900/90 text-sm text-white px-3 py-2.5 rounded-xl border border-purple-500/50 uppercase tracking-widest font-mono focus:outline-none focus:ring-1 focus:ring-purple-500">
+        </div>
+      </div>
+
+      <div class="flex space-x-2 pt-1">
+        <button type="button" onclick="closeAddFriendModal()" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs rounded-xl transition">
+          キャンセル
+        </button>
+        <button type="button" onclick="saveNewFriend()" class="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow transition">
+          登録する
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Firebase Production Configuration
     const firebaseConfig = {
@@ -436,6 +494,8 @@
     let myUserId = "";
     let targetMode = "self"; // "self" or "friend"
     let isSpeakerMode = false; // false = earpiece (default), true = loudspeaker
+    let friends = []; // Registered friends list [{id: 'OU-XXXX', name: 'たくや'}]
+    let selectedFriendId = null;
 
     let currentAudioElement = null;
     let currentlyPlayingHistoryId = null;
@@ -445,6 +505,7 @@
     window.onload = () => {
       initMyUserId();
       initFirebase();
+      initFriendsList();
 
       const savedAvatar = localStorage.getItem('ourie_user_avatar');
       const savedName = localStorage.getItem('ourie_user_name');
@@ -484,6 +545,127 @@
       myUserId = storedId;
       const displayEl = document.getElementById('my-user-id-display');
       if (displayEl) displayEl.innerText = myUserId;
+    }
+
+    function initFriendsList() {
+      const stored = localStorage.getItem('ourie_friends_list');
+      if (stored) {
+        try {
+          friends = JSON.parse(stored);
+        } catch (e) {
+          friends = [];
+        }
+      }
+      renderFriendsUI();
+    }
+
+    function saveFriendsList() {
+      localStorage.setItem('ourie_friends_list', JSON.stringify(friends));
+      renderFriendsUI();
+    }
+
+    function openAddFriendModal() {
+      document.getElementById('new-friend-name').value = '';
+      document.getElementById('new-friend-id').value = '';
+      document.getElementById('add-friend-modal').classList.remove('hidden');
+    }
+
+    function closeAddFriendModal() {
+      document.getElementById('add-friend-modal').classList.add('hidden');
+    }
+
+    function saveNewFriend() {
+      const nameInput = document.getElementById('new-friend-name').value.trim();
+      const idInput = document.getElementById('new-friend-id').value.trim().toUpperCase();
+
+      if (!nameInput || !idInput) return;
+
+      // Update if already exists, otherwise add
+      const existingIndex = friends.findIndex(f => f.id === idInput);
+      if (existingIndex >= 0) {
+        friends[existingIndex].name = nameInput;
+      } else {
+        friends.push({ id: idInput, name: nameInput });
+      }
+
+      saveFriendsList();
+      closeAddFriendModal();
+      selectFriend(idInput);
+    }
+
+    function renderFriendsUI() {
+      const container = document.getElementById('friends-chip-list');
+      if (!container) return;
+
+      container.innerHTML = '';
+
+      if (friends.length === 0) {
+        container.innerHTML = `
+          <div class="text-[11px] text-slate-500 py-1 flex items-center space-x-1.5">
+            <i class="fa-regular fa-address-book"></i>
+            <span>登録された友達はまだいません（右上の「友達を追加」から登録）</span>
+          </div>
+        `;
+        return;
+      }
+
+      friends.forEach(friend => {
+        const isSelected = selectedFriendId === friend.id;
+        const chip = document.createElement('div');
+        chip.className = `flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs cursor-pointer transition shrink-0 ${
+          isSelected 
+            ? 'bg-purple-600/90 border-purple-300 text-white font-bold shadow' 
+            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-purple-400/60'
+        }`;
+
+        chip.onclick = () => selectFriend(friend.id);
+
+        chip.innerHTML = `
+          <i class="fa-solid fa-user text-[11px] ${isSelected ? 'text-white' : 'text-purple-400'}"></i>
+          <span class="truncate max-w-[100px]">${friend.name}</span>
+          <button type="button" onclick="deleteFriend('${friend.id}', event)" class="ml-1 text-[10px] text-slate-400 hover:text-red-400 pl-1">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        `;
+
+        container.appendChild(chip);
+      });
+    }
+
+    function selectFriend(friendId) {
+      selectedFriendId = friendId;
+      const friend = friends.find(f => f.id === friendId);
+      const input = document.getElementById('friend-id-input');
+      const label = document.getElementById('selected-friend-label');
+      const clearBtn = document.getElementById('clear-selected-friend-btn');
+
+      if (friend && input) {
+        input.value = friend.id;
+        if (label) label.innerHTML = `宛先: <strong class="text-purple-300">${friend.name} (${friend.id})</strong>`;
+        if (clearBtn) clearBtn.classList.remove('hidden');
+      }
+      renderFriendsUI();
+    }
+
+    function clearSelectedFriend() {
+      selectedFriendId = null;
+      const input = document.getElementById('friend-id-input');
+      const label = document.getElementById('selected-friend-label');
+      const clearBtn = document.getElementById('clear-selected-friend-btn');
+
+      if (input) input.value = '';
+      if (label) label.innerText = '直接ID入力 または 上の友達を選択';
+      if (clearBtn) clearBtn.classList.add('hidden');
+      renderFriendsUI();
+    }
+
+    function deleteFriend(friendId, event) {
+      if (event) event.stopPropagation();
+      friends = friends.filter(f => f.id !== friendId);
+      if (selectedFriendId === friendId) {
+        clearSelectedFriend();
+      }
+      saveFriendsList();
     }
 
     function copyMyUserId() {
@@ -665,6 +847,12 @@
                 capsules.unshift(newCap);
                 saveCapsulesToStorage();
                 renderCapsules();
+
+                // Automatically add or update sender in friends list for easy reply
+                if (data.senderId && !friends.some(f => f.id === data.senderId)) {
+                  friends.push({ id: data.senderId, name: data.senderName || '友達' });
+                  saveFriendsList();
+                }
               }
             }
           });
