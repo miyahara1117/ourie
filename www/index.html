@@ -286,9 +286,9 @@
           <p id="memory-reveal-subtitle" class="text-xs text-purple-200">通話終了後に届いたメッセージ写真です</p>
         </div>
 
-        <div class="relative w-full aspect-square bg-slate-950 rounded-2xl overflow-hidden border-2 border-purple-400/40 shadow-2xl flex items-center justify-center">
-          <img id="reveal-photo-img" src="" alt="Memory Photo" class="w-full h-full object-cover">
-          <div id="reveal-photo-placeholder" class="hidden text-slate-500 text-center p-4">
+        <div class="relative w-full max-h-[58vh] bg-slate-950/80 rounded-2xl overflow-hidden border-2 border-purple-400/40 shadow-2xl flex items-center justify-center p-1.5">
+          <img id="reveal-photo-img" src="" alt="Memory Photo" class="max-w-full max-h-[54vh] w-auto h-auto object-contain rounded-xl shadow-inner">
+          <div id="reveal-photo-placeholder" class="hidden text-slate-500 text-center p-6">
             <i class="fa-regular fa-image text-3xl mb-2"></i>
             <p class="text-xs">写真の添付はありませんでした</p>
           </div>
@@ -445,7 +445,7 @@
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const maxDim = 400;
+          const maxDim = 800; // 解像度を高め、撮った写真の綺麗さを保持
           if (width > height && width > maxDim) {
             height = Math.round((height * maxDim) / width);
             width = maxDim;
@@ -458,7 +458,7 @@
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          memoryPhotoData = canvas.toDataURL('image/jpeg', 0.65);
+          memoryPhotoData = canvas.toDataURL('image/jpeg', 0.75);
           document.getElementById('memory-photo-preview').src = memoryPhotoData;
           document.getElementById('memory-photo-preview-wrap').classList.remove('hidden');
           document.getElementById('photo-btn-text').innerText = "写真を変更する";
