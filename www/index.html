@@ -488,6 +488,8 @@
     let replyAudioChunks = [];
     let replyAudioBlob = null;
     let replyAudioUrl = null;
+    let replyAudioBase64 = null;
+    let currentlyPlayingReplyId = null;
 
     let userAvatarData = null;
     let userName = "過去の自分";
@@ -1292,15 +1294,59 @@
       const titleEl = document.getElementById('reveal-sender-title');
       const imgEl = document.getElementById('reveal-photo-img');
       const dateEl = document.getElementById('reveal-photo-date');
+      const replyBox = document.getElementById('reveal-reply-audio-box');
 
       titleEl.innerText = `${capsule.senderName || '過去の自分'} からの写真`;
-      imgEl.src = capsule.photoData;
+      imgEl.src = capsule.photoData || '';
+      if (!capsule.photoData) {
+        imgEl.classList.add('hidden');
+      } else {
+        imgEl.classList.remove('hidden');
+      }
       dateEl.innerText = `お届け日時: ${capsule.targetTimeText || '本日'}`;
+
+      if (capsule.replyAudioUrl) {
+        if (replyBox) replyBox.classList.remove('hidden');
+      } else {
+        if (replyBox) replyBox.classList.add('hidden');
+      }
 
       modal.classList.remove('hidden');
     }
 
+    function playRevealReplyAudio() {
+      if (!activeCallingCapsule || !activeCallingCapsule.replyAudioUrl) return;
+      const playIcon = document.getElementById('reveal-reply-play-icon');
+      const playLabel = document.getElementById('reveal-reply-play-label');
+
+      if (currentAudioElement) {
+        stopAllPlayingAudio();
+        if (playIcon) playIcon.className = "fa-solid fa-play text-[10px]";
+        if (playLabel) playLabel.innerText = "聴く";
+        return;
+      }
+
+      const audio = new Audio(activeCallingCapsule.replyAudioUrl);
+      currentAudioElement = audio;
+      applySpeakerRoutingToElement(audio, isSpeakerMode);
+
+      if (playIcon) playIcon.className = "fa-solid fa-stop text-[10px]";
+      if (playLabel) playLabel.innerText = "停止";
+
+      audio.onended = () => {
+        stopAllPlayingAudio();
+        if (playIcon) playIcon.className = "fa-solid fa-play text-[10px]";
+        if (playLabel) playLabel.innerText = "聴く";
+      };
+
+      audio.play().catch(e => {
+        console.warn("Reply playback error:", e);
+        stopAllPlayingAudio();
+      });
+    }
+
     function closePhotoRevealModal() {
+      stopAllPlayingAudio();
       document.getElementById('photo-reveal-modal').classList.add('hidden');
       activeCallingCapsule = null;
     }
@@ -1312,6 +1358,7 @@
         currentAudioElement = null;
       }
       currentlyPlayingHistoryId = null;
+      currentlyPlayingReplyId = null;
       renderCapsules();
     }
 
@@ -1330,8 +1377,18 @@
           };
           replyMediaRecorder.onstop = () => {
             replyAudioBlob = new Blob(replyAudioChunks, { type: 'audio/webm' });
-            replyAudioUrl = URL.createObjectURL(replyAudioBlob);
-            label.innerText = "返信音声を記録しました ✓";
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              replyAudioBase64 = reader.result;
+              if (activeCallingCapsule) {
+                activeCallingCapsule.replyAudioUrl = replyAudioBase64;
+                saveCapsulesToStorage();
+                renderCapsules();
+              }
+            };
+            reader.readAsDataURL(replyAudioBlob);
+
+            label.innerText = "返信音声を記録・保存しました ✓";
             icon.className = "fa-solid fa-check text-emerald-400";
             btn.className = "w-full py-2.5 px-4 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-xs font-semibold text-emerald-300 flex items-center justify-center space-x-2";
           };
@@ -1371,7 +1428,7 @@
 
       capsules.forEach((cap) => {
         const item = document.createElement('div');
-        item.className = "p-3.5 bg-[#1E293B] rounded-2xl border border-slate-700 flex items-center justify-between space-x-3 shadow-sm";
+        item.className = "p-3.5 bg-[#1E293B] rounded-2xl border border-slate-700 flex flex-col space-y-2.5 shadow-sm";
 
         const isScheduled = cap.status === 'scheduled';
         const statusBadge = isScheduled 
@@ -1380,41 +1437,84 @@
 
         const hasPhoto = cap.photoData ? `<i class="fa-solid fa-camera text-purple-400 text-xs" title="写真あり"></i>` : '';
         const isPlayingThis = currentlyPlayingHistoryId === cap.id;
+        const isPlayingReply = currentlyPlayingReplyId === cap.id;
 
         const audioBtn = cap.audioUrl ? `
-          <button type="button" onclick="togglePlaySingleHistoryAudio(${cap.id})" class="w-8 h-8 rounded-full ${isPlayingThis ? 'bg-red-600 hover:bg-red-500' : 'bg-purple-600 hover:bg-purple-500'} text-white flex items-center justify-center shadow text-xs transition active:scale-95">
-            <i class="fa-solid ${isPlayingThis ? 'fa-stop' : 'fa-play'}"></i>
+          <button type="button" onclick="togglePlaySingleHistoryAudio(${cap.id})" class="px-2.5 py-1.5 rounded-xl ${isPlayingThis ? 'bg-red-600 hover:bg-red-500' : 'bg-purple-600 hover:bg-purple-500'} text-white flex items-center space-x-1.5 shadow text-xs font-semibold transition active:scale-95">
+            <i class="fa-solid ${isPlayingThis ? 'fa-stop' : 'fa-play'} text-[11px]"></i>
+            <span>${isPlayingThis ? '停止' : '通話音声'}</span>
+          </button>
+        ` : '';
+
+        const replyBtn = cap.replyAudioUrl ? `
+          <button type="button" onclick="togglePlayReplyAudio(${cap.id})" class="px-2.5 py-1.5 rounded-xl ${isPlayingReply ? 'bg-red-600 hover:bg-red-500' : 'bg-emerald-700 hover:bg-emerald-600'} text-white flex items-center space-x-1.5 shadow text-xs font-semibold transition active:scale-95 border border-emerald-400/40">
+            <i class="fa-solid ${isPlayingReply ? 'fa-stop' : 'fa-microphone'} text-[11px]"></i>
+            <span>${isPlayingReply ? '停止' : 'あなたの返答'}</span>
           </button>
         ` : '';
 
         const photoBtn = cap.photoData ? `
-          <button type="button" onclick="viewHistoryPhoto(${cap.id})" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-600 flex items-center justify-center text-xs transition active:scale-95">
+          <button type="button" onclick="viewHistoryPhoto(${cap.id})" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-600 flex items-center justify-center text-xs transition active:scale-95" title="写真を見る">
             <i class="fa-solid fa-image"></i>
           </button>
         ` : '';
 
         item.innerHTML = `
-          <div class="flex items-center space-x-3 overflow-hidden">
-            <div class="w-10 h-10 min-w-[2.5rem] rounded-full overflow-hidden bg-slate-800 border border-purple-400/40 shrink-0 flex items-center justify-center">
-              <img src="${cap.senderAvatar || 'icon.png'}" alt="Avatar" class="w-full h-full object-cover">
-            </div>
-            <div class="overflow-hidden">
-              <div class="flex items-center space-x-1.5">
-                <p class="text-xs font-bold text-white truncate">${cap.senderName || '過去の自分'}</p>
-                ${hasPhoto}
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3 overflow-hidden">
+              <div class="w-10 h-10 min-w-[2.5rem] rounded-full overflow-hidden bg-slate-800 border border-purple-400/40 shrink-0 flex items-center justify-center">
+                <img src="${cap.senderAvatar || 'icon.png'}" alt="Avatar" class="w-full h-full object-cover">
               </div>
-              <p class="text-[11px] text-slate-400">${cap.targetTimeText}</p>
+              <div class="overflow-hidden">
+                <div class="flex items-center space-x-1.5">
+                  <p class="text-xs font-bold text-white truncate">${cap.senderName || '過去の自分'}</p>
+                  ${hasPhoto}
+                </div>
+                <p class="text-[11px] text-slate-400">${cap.targetTimeText}</p>
+              </div>
+            </div>
+            <div class="shrink-0">
+              ${statusBadge}
             </div>
           </div>
 
-          <div class="flex items-center space-x-2 shrink-0">
-            ${statusBadge}
-            ${audioBtn}
+          <!-- Actions Bar -->
+          <div class="flex items-center justify-end space-x-2 pt-1 border-t border-slate-800/80">
             ${photoBtn}
+            ${audioBtn}
+            ${replyBtn}
           </div>
         `;
         container.appendChild(item);
       });
+    }
+
+    function togglePlayReplyAudio(id) {
+      if (currentlyPlayingReplyId === id) {
+        stopAllPlayingAudio();
+        return;
+      }
+
+      const cap = capsules.find(c => c.id === id);
+      if (!cap || !cap.replyAudioUrl) return;
+
+      stopAllPlayingAudio();
+
+      const audio = new Audio(cap.replyAudioUrl);
+      currentAudioElement = audio;
+      currentlyPlayingReplyId = id;
+      applySpeakerRoutingToElement(audio, isSpeakerMode);
+
+      audio.onended = () => {
+        stopAllPlayingAudio();
+      };
+
+      audio.play().catch(e => {
+        console.warn("Reply audio playback error:", e);
+        stopAllPlayingAudio();
+      });
+
+      renderCapsules();
     }
 
     function togglePlaySingleHistoryAudio(id) {
