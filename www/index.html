@@ -3,307 +3,402 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Ourie</title>
+  <title>Ourie - 音声タイムカプセル</title>
   <link rel="icon" id="app-favicon" href="icon.png" type="image/png">
   <link rel="apple-touch-icon" href="icon.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Firebase SDKs for Friend-to-Friend Capsule Sync -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
   <style>
     html, body {
       height: 100%;
       height: 100dvh;
       overflow: hidden;
-      background-color: #0b0f19;
-      color: #f8fafc;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #0B0F19;
+      color: #F8FAFC;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
     .pulse-animation {
-      animation: pulse 1.5s infinite;
+      animation: pulseGlow 2s infinite ease-in-out;
     }
-    @keyframes pulse {
-      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-      70% { transform: scale(1.05); box-shadow: 0 0 0 16px rgba(239, 68, 68, 0); }
-      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    @keyframes pulseGlow {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.7); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 18px rgba(167, 139, 250, 0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(167, 139, 250, 0); }
     }
-    .playing-glow {
-      animation: glow 1.2s infinite alternate;
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
     }
-    @keyframes glow {
-      from { border-color: rgba(167, 139, 250, 0.4); box-shadow: 0 0 8px rgba(124, 58, 237, 0.4); }
-      to { border-color: rgba(167, 139, 250, 0.9); box-shadow: 0 0 18px rgba(124, 58, 237, 0.8); }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
     }
-    .fade-in-scale {
-      animation: fadeInScale 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    .calling-wave {
+      animation: callWave 1.8s infinite;
     }
-    @keyframes fadeInScale {
-      from { opacity: 0; transform: scale(0.92); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-      filter: invert(1);
-      cursor: pointer;
+    @keyframes callWave {
+      0% { transform: scale(0.95); opacity: 0.9; }
+      50% { transform: scale(1.2); opacity: 0.3; }
+      100% { transform: scale(0.95); opacity: 0.9; }
     }
   </style>
 </head>
-<body class="flex justify-center items-center w-full h-full bg-[#0b0f19] p-0 sm:p-2">
+<body class="flex flex-col h-full bg-[#0B0F19]">
 
-  <div class="relative w-full max-w-[440px] h-full sm:h-[860px] bg-[#0F172A] sm:rounded-[36px] shadow-2xl border-0 sm:border-4 border-slate-800 overflow-hidden flex flex-col">
-    
-    <div class="bg-slate-900/95 border-b border-slate-800/80 px-4 py-2.5 flex items-center justify-between shrink-0 z-20">
-      <div class="flex items-center space-x-2.5">
-        <div class="w-8 h-8 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center border border-purple-400/40 shrink-0">
-          <img id="header-avatar-img" src="icon.png" alt="Ourie Profile" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
-        </div>
-        <span class="text-sm font-bold tracking-wide text-white truncate max-w-[120px]" id="header-user-name">Ourie</span>
+  <!-- Header Bar -->
+  <header class="shrink-0 h-14 bg-[#111827]/90 border-b border-slate-800/80 px-4 flex items-center justify-between backdrop-blur-md z-10">
+    <div class="flex items-center space-x-2.5">
+      <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 p-0.5 shadow-md flex items-center justify-center overflow-hidden">
+        <img id="header-avatar-img" src="icon.png" alt="Ourie" class="w-full h-full object-cover rounded-full" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
       </div>
-
-      <!-- Speaker Mode Toggle Button -->
-      <button id="global-speaker-toggle-btn" type="button" onclick="toggleGlobalSpeakerMode()"
-        class="px-3 py-1.5 bg-[#1E293B] hover:bg-slate-800 border border-purple-500/40 rounded-full flex items-center space-x-2 transition-all cursor-pointer active:scale-95 shadow-sm">
-        <i id="global-speaker-icon" class="fa-solid fa-phone-volume text-xs text-[#A78BFA]"></i>
-        <span id="global-speaker-text" class="text-xs font-semibold text-purple-200">受話器 (耳あて)</span>
-      </button>
+      <div>
+        <h1 class="text-base font-extrabold tracking-wide text-white flex items-center gap-1.5">
+          <span>Ourie</span>
+          <span class="text-[10px] px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded font-semibold border border-purple-400/30">TIME CAPSULE</span>
+        </h1>
+        <p id="header-user-name" class="text-[11px] text-slate-400">過去の自分</p>
+      </div>
     </div>
 
-    <div id="app-content" class="flex-1 overflow-y-auto p-4 pb-20 space-y-3.5">
-      
-      <!-- Screen 1: Capsule Creation -->
-      <div id="screen-record" class="space-y-3">
-        
-        <!-- Audio Output Banner -->
-        <div class="p-3 rounded-2xl bg-gradient-to-r from-[#4C1D95]/60 to-[#1E293B] border border-[#7C3AED]/40 space-y-1 shadow-sm">
-          <div class="flex items-center space-x-2 text-[#A78BFA] text-xs font-bold">
-            <i id="banner-mode-icon" class="fa-solid fa-ear-listen text-xs"></i>
-            <span id="banner-output-mode-text">再生出力を「耳あて通話スピーカー」に設定中</span>
-          </div>
-          <p id="banner-subtext" class="text-xs text-slate-300 leading-relaxed">
-            スマホを耳に当てて通話感覚でお聴きいただけます。<br>右上ボタンで本体スピーカーへ即座に切り替え可能です。
-          </p>
+    <!-- Quick Audio Output Switch -->
+    <button id="speaker-toggle-btn" type="button" onclick="toggleSpeakerMode()" class="px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs font-semibold flex items-center space-x-1.5 text-purple-300 hover:bg-slate-700 transition active:scale-95 shadow">
+      <i id="speaker-icon" class="fa-solid fa-phone text-xs"></i>
+      <span id="speaker-status-label">受話器（耳あて）</span>
+    </button>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 overflow-y-auto custom-scrollbar p-3.5 space-y-3.5 max-w-md mx-auto w-full">
+
+    <!-- Tab 1: Create & Schedule Capsule View -->
+    <section id="view-create" class="space-y-3.5 pb-20">
+
+      <!-- Speaker Guidance Banner -->
+      <div class="p-3 bg-purple-950/40 rounded-2xl border border-purple-500/30 flex items-start space-x-2.5 text-xs text-purple-200">
+        <i class="fa-solid fa-circle-info text-purple-400 mt-0.5 shrink-0 text-sm"></i>
+        <p id="speaker-banner-text" class="leading-relaxed">
+          スマホを耳に当てて通話感覚でお聴きいただけます。<br>右上ボタンで本体スピーカーへ即座に切り替え可能です。
+        </p>
+      </div>
+
+      <!-- Profile & Ourie ID Card -->
+      <div class="p-3.5 bg-[#1E293B]/90 rounded-2xl border border-purple-500/30 space-y-2.5 shadow-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-purple-200 flex items-center space-x-1.5">
+            <i class="fa-solid fa-id-card text-[#A78BFA] text-sm"></i>
+            <span>プロフィール設定</span>
+          </span>
+          <!-- Ourie ID Tag & Copy Button -->
+          <button type="button" onclick="copyMyUserId()" class="text-xs bg-purple-950 border border-purple-500/60 text-purple-300 px-2.5 py-1 rounded-full flex items-center space-x-1.5 hover:bg-purple-900 transition active:scale-95">
+            <span>ID: <strong id="my-user-id-display">OU-0000</strong></span>
+            <i class="fa-regular fa-copy text-xs"></i>
+          </button>
         </div>
 
-        <!-- Profile Settings (Avatar & Name) -->
-        <div class="p-3 bg-[#1E293B]/90 rounded-2xl border border-purple-500/30 space-y-2 shadow-sm">
+        <div class="flex items-center space-x-3 pt-1">
+          <!-- Avatar Uploader -->
+          <div class="relative group cursor-pointer shrink-0" onclick="document.getElementById('avatar-file-input').click()">
+            <div class="w-13 h-13 rounded-full overflow-hidden bg-slate-800 border-2 border-purple-400/60 shadow flex items-center justify-center">
+              <img id="profile-avatar-preview" src="icon.png" alt="Profile Avatar" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
+            </div>
+            <div class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
+              <i class="fa-solid fa-camera text-white text-xs"></i>
+            </div>
+            <input id="avatar-file-input" type="file" accept="image/*" class="hidden" onchange="handleAvatarUpload(event)">
+          </div>
+
+          <div class="flex-1 space-y-1">
+            <label class="text-xs text-slate-300 font-medium block">表示名（着信時に相手の画面に表示）</label>
+            <input id="profile-name-input" type="text" value="過去の自分" placeholder="例: 1年前の自分、ひろき" 
+              oninput="handleNameChange(this.value)"
+              class="w-full bg-slate-900/90 text-sm text-white px-3 py-2 rounded-xl border border-slate-700 focus:outline-none focus:ring-1 focus:ring-purple-500">
+          </div>
+        </div>
+      </div>
+
+      <!-- Target Selector: Self vs Friend -->
+      <div class="p-3.5 bg-[#1E293B]/90 rounded-2xl border border-slate-700/80 space-y-2.5 shadow-sm">
+        <label class="text-xs text-purple-200 font-bold flex items-center space-x-1.5">
+          <i class="fa-solid fa-paper-plane text-[#A78BFA]"></i>
+          <span>お届け先の選択</span>
+        </label>
+        
+        <div class="grid grid-cols-2 gap-2">
+          <button id="target-mode-self-btn" type="button" onclick="setTargetMode('self')" 
+            class="py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 bg-[#7C3AED] text-white border border-purple-400/50 shadow transition-all cursor-pointer">
+            <i class="fa-solid fa-user"></i>
+            <span>未来の自分へ</span>
+          </button>
+          <button id="target-mode-friend-btn" type="button" onclick="setTargetMode('friend')" 
+            class="py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition-all cursor-pointer">
+            <i class="fa-solid fa-user-group"></i>
+            <span>友達へ届ける</span>
+          </button>
+        </div>
+
+        <!-- Friend ID Input Container -->
+        <div id="friend-id-container" class="hidden pt-1.5 space-y-1">
+          <label class="text-xs text-slate-300 font-medium block">お届け先の相手の Ourie ID</label>
+          <div class="relative">
+            <input id="friend-id-input" type="text" placeholder="例: OU-8392" 
+              class="w-full bg-slate-900/90 text-sm text-white px-3 py-2.5 rounded-xl border border-purple-500/50 uppercase tracking-widest font-mono focus:outline-none focus:ring-1 focus:ring-purple-500">
+          </div>
+          <p class="text-[11px] text-slate-400">※ お相手のOurieアプリに表示されているIDを入力してください</p>
+        </div>
+      </div>
+
+      <!-- Voice Recording Card -->
+      <div class="p-4 bg-[#1E293B] rounded-2xl border border-slate-700/80 text-center space-y-3 shadow-inner">
+        <div class="flex items-center justify-between text-xs font-semibold text-slate-300 px-1">
+          <span class="flex items-center space-x-1.5">
+            <i class="fa-solid fa-microphone-lines text-purple-400"></i>
+            <span>未来へ届ける声を録音</span>
+          </span>
+          <span id="recording-timer" class="font-mono text-purple-300 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700">00:00</span>
+        </div>
+
+        <!-- Record Trigger Button -->
+        <div class="py-2 flex flex-col items-center justify-center">
+          <button id="record-btn" type="button" onclick="toggleRecording()" 
+            class="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg border-2 border-purple-300/40 active:scale-95 transition-all">
+            <i id="record-btn-icon" class="fa-solid fa-microphone"></i>
+          </button>
+          <p id="mic-status" class="text-xs text-slate-400 mt-2 font-medium">タップして録音を開始</p>
+        </div>
+
+        <!-- Pre-send Listening Test -->
+        <div id="playback-preview-box" class="hidden p-3 bg-slate-900/90 rounded-xl border border-purple-500/40 space-y-2">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-purple-200 flex items-center space-x-1.5">
-              <i class="fa-solid fa-id-card text-[#A78BFA] text-sm"></i>
-              <span>プロフィール設定</span>
+            <span class="text-xs font-semibold text-purple-300 flex items-center gap-1.5">
+              <i class="fa-solid fa-headphones-simple"></i>
+              <span>録音音声の確認</span>
             </span>
-            <span class="text-[11px] text-slate-400">着信画面に反映</span>
+            <span id="preview-audio-duration" class="text-xs text-slate-400 font-mono">00:00</span>
           </div>
-
-          <div class="flex items-center space-x-3 pt-0.5">
-            <div class="relative group cursor-pointer shrink-0" onclick="document.getElementById('avatar-file-input').click()">
-              <div class="w-12 h-12 rounded-full overflow-hidden bg-slate-800 border-2 border-purple-400/60 shadow flex items-center justify-center">
-                <img id="profile-avatar-preview" src="icon.png" alt="Profile Avatar" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
-              </div>
-              <div class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
-                <i class="fa-solid fa-camera text-white text-xs"></i>
-              </div>
-              <input id="avatar-file-input" type="file" accept="image/*" class="hidden" onchange="handleAvatarUpload(event)">
-            </div>
-
-            <div class="flex-1 space-y-1">
-              <label class="text-xs text-slate-300 font-medium block">表示名（着信時の名前）</label>
-              <input id="profile-name-input" type="text" value="過去の自分" placeholder="例: 1年前の自分、みや" 
-                oninput="handleNameChange(this.value)"
-                class="w-full bg-slate-900/90 text-sm text-white px-3 py-1.5 rounded-xl border border-slate-700 focus:outline-none focus:ring-1 focus:ring-[#7C3AED]">
-            </div>
-          </div>
-        </div>
-
-        <div class="p-3.5 bg-[#1E293B] rounded-2xl border border-slate-700/80 text-center space-y-2 shadow-inner">
-          <button id="mic-btn" type="button" onclick="startOrStopRecording()" 
-            class="w-14 h-14 rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white flex items-center justify-center mx-auto transition-all shadow-lg shadow-[#7C3AED]/40 active:scale-95 cursor-pointer">
-            <i id="mic-icon" class="fa-solid fa-microphone text-xl"></i>
-          </button>
-          <p id="mic-status" class="text-xs text-slate-200 font-medium leading-normal">マイクボタンを押して音声を吹き込む</p>
-
-          <!-- Voice Preview Buttons -->
-          <div id="preview-container" class="hidden pt-2 border-t border-slate-700/60 space-y-2">
-            <div class="flex justify-center items-center space-x-2">
-              <button id="preview-play-btn" type="button" onclick="playPreview()" 
-                class="px-3 py-1.5 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-1.5 border border-purple-400/30 transition-all cursor-pointer">
-                <i id="preview-icon" class="fa-solid fa-play text-xs text-purple-200"></i>
-                <span id="preview-text">録音を再生確認</span>
-              </button>
-              <button type="button" onclick="toggleGlobalSpeakerMode()" 
-                class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-200 text-xs font-medium rounded-xl border border-slate-600 flex items-center space-x-1.5 transition-all cursor-pointer">
-                <i class="fa-solid fa-arrows-rotate text-xs text-amber-300"></i>
-                <span id="console-speaker-toggle-text">受話器 ⇄ スピーカー</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="p-3 bg-[#1E293B]/90 rounded-2xl border border-slate-700/80 space-y-2">
-          <div class="flex items-center justify-between">
-            <label class="text-xs text-purple-200 font-bold flex items-center space-x-1.5">
-              <i class="fa-solid fa-image text-[#A78BFA]"></i>
-              <span>思い出の写真（通話終了後に開きます）</span>
-            </label>
-            <span class="text-[11px] text-slate-400">任意</span>
-          </div>
-
-          <div class="flex items-center space-x-3">
-            <div id="memory-photo-preview-wrap" class="relative hidden w-16 h-16 rounded-xl overflow-hidden border border-purple-400/60 bg-slate-900 shrink-0">
-              <img id="memory-photo-preview" src="" alt="Memory Photo" class="w-full h-full object-cover">
-              <button type="button" onclick="removeMemoryPhoto()" class="absolute top-1 right-1 w-5 h-5 bg-black/70 text-white rounded-full flex items-center justify-center text-[10px] hover:bg-red-600">
-                <i class="fa-solid fa-xmark"></i>
-              </button>
-            </div>
-
-            <button id="add-photo-btn" type="button" onclick="document.getElementById('memory-photo-input').click()" 
-              class="flex-1 py-2 px-3 bg-slate-900/90 hover:bg-slate-800 border border-dashed border-purple-500/40 rounded-xl text-xs text-purple-200 font-medium flex items-center justify-center space-x-2 cursor-pointer transition-colors">
-              <i class="fa-solid fa-camera-retro text-sm text-[#A78BFA]"></i>
-              <span id="photo-btn-text">写真を選択・撮影する</span>
+          <div class="flex space-x-2">
+            <button id="preview-earpiece-btn" type="button" onclick="playPreviewAudio(false)" class="flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 flex items-center justify-center space-x-1.5">
+              <i class="fa-solid fa-phone-volume text-purple-400"></i>
+              <span>受話器で確認</span>
             </button>
-            <input id="memory-photo-input" type="file" accept="image/*" class="hidden" onchange="handleMemoryPhotoUpload(event)">
-          </div>
-        </div>
-
-        <div class="space-y-1.5">
-          <div class="flex items-center justify-between">
-            <label class="text-xs text-slate-300 font-medium flex items-center space-x-1.5">
-              <i class="fa-regular fa-clock text-xs text-[#A78BFA]"></i>
-              <span>未来の着信日時を指定</span>
-            </label>
-            <button type="button" onclick="setQuickTestTime(10)" class="text-[11px] text-purple-300 bg-purple-950/80 border border-purple-500/40 px-2 py-0.5 rounded-lg hover:bg-purple-900 transition-colors">
-              ⚡ 10秒後にテスト着信
+            <button id="preview-speaker-btn" type="button" onclick="playPreviewAudio(true)" class="flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 flex items-center justify-center space-x-1.5">
+              <i class="fa-solid fa-volume-high text-indigo-400"></i>
+              <span>スピーカー確認</span>
             </button>
           </div>
-          <input id="datetime-input" type="datetime-local" 
-            class="w-full bg-[#1E293B] text-sm text-white px-3 py-2 rounded-xl border border-slate-700/80 focus:outline-none focus:ring-1 focus:ring-[#7C3AED]">
+        </div>
+      </div>
+
+      <!-- Memory Photo Attachment (Preserves Aspect Ratio) -->
+      <div class="p-3.5 bg-[#1E293B]/90 rounded-2xl border border-slate-700/80 space-y-2.5 shadow-sm">
+        <div class="flex items-center justify-between">
+          <label class="text-xs text-purple-200 font-bold flex items-center space-x-1.5">
+            <i class="fa-solid fa-camera-retro text-[#A78BFA]"></i>
+            <span>思い出の写真（通話終了後に開封）</span>
+          </label>
+          <span class="text-[11px] text-slate-400">任意・画角そのまま</span>
         </div>
 
-        <!-- Schedule Capsule Button -->
-        <div class="pt-1">
-          <button id="schedule-btn" type="button" disabled onclick="scheduleCapsuleForSelf()" 
-            class="w-full py-3 bg-slate-800 text-slate-500 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md">
-            <i class="fa-solid fa-phone-arrow-up-right text-base"></i>
-            <span>未来の自分へタイムカプセルを予約する</span>
+        <div id="photo-upload-area" onclick="document.getElementById('memory-photo-input').click()" 
+          class="border-2 border-dashed border-slate-700 hover:border-purple-400/80 rounded-xl p-3 text-center cursor-pointer transition bg-slate-900/60">
+          <div id="photo-placeholder-content" class="py-2 space-y-1">
+            <i class="fa-regular fa-image text-2xl text-purple-400/80"></i>
+            <p class="text-xs text-slate-300 font-medium">タップして写真を追加</p>
+            <p class="text-[11px] text-slate-400">通話を切った瞬間に全画面で現れます</p>
+          </div>
+          <!-- Photo preview maintaining aspect ratio -->
+          <div id="photo-preview-wrapper" class="hidden relative rounded-lg overflow-hidden bg-black/60 flex items-center justify-center p-1">
+            <img id="photo-preview-img" src="" alt="Memory Photo" class="max-h-56 max-w-full w-auto h-auto object-contain rounded">
+            <button type="button" onclick="removeMemoryPhoto(event)" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-red-600 transition shadow">
+              <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+          </div>
+          <input id="memory-photo-input" type="file" accept="image/*" class="hidden" onchange="handleMemoryPhotoUpload(event)">
+        </div>
+      </div>
+
+      <!-- Schedule Call Date & Quick Testing Buttons -->
+      <div class="p-3.5 bg-[#1E293B]/90 rounded-2xl border border-slate-700/80 space-y-2.5 shadow-sm">
+        <label class="text-xs text-purple-200 font-bold flex items-center space-x-1.5">
+          <i class="fa-regular fa-clock text-[#A78BFA]"></i>
+          <span>お届け日時（着信日時）</span>
+        </label>
+
+        <!-- Quick Test Buttons -->
+        <div class="grid grid-cols-3 gap-1.5">
+          <button type="button" onclick="setQuickTestTime(10)" class="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-purple-300 rounded-lg border border-purple-500/30 transition text-center">
+            ⚡ 10秒後テスト
+          </button>
+          <button type="button" onclick="setQuickTestTime(60)" class="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-purple-300 rounded-lg border border-purple-500/30 transition text-center">
+            ⏰ 1分後
+          </button>
+          <button type="button" onclick="setQuickTestTime(3600)" class="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-purple-300 rounded-lg border border-purple-500/30 transition text-center">
+            📅 1時間後
           </button>
         </div>
 
-        <!-- Success Toast Notification -->
-        <div id="scheduled-toast" class="hidden p-3 rounded-xl bg-emerald-950/90 border border-emerald-500/60 text-emerald-200 text-xs text-center space-y-1">
-          <div class="font-bold flex items-center justify-center space-x-1.5">
-            <i class="fa-solid fa-circle-check text-emerald-400"></i>
-            <span>着信予約が完了しました！</span>
-          </div>
-          <p id="scheduled-toast-time" class="text-[11px] text-emerald-300/90"></p>
-        </div>
-
+        <input id="datetime-input" type="datetime-local" 
+          class="w-full bg-slate-900/90 text-sm text-white px-3 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:ring-1 focus:ring-purple-500">
       </div>
 
-      <div id="screen-history" class="hidden space-y-3">
-        <div class="flex items-center justify-between pb-1">
-          <h2 class="text-base font-bold text-white flex items-center space-x-2">
-            <i class="fa-solid fa-box-archive text-[#A78BFA]"></i>
-            <span>予約中・届いた通話一覧</span>
-          </h2>
-          <span id="capsule-count" class="text-xs text-slate-400 font-semibold bg-slate-800 px-2.5 py-0.5 rounded-full">0件</span>
-        </div>
-        <div id="capsule-list" class="space-y-3"></div>
+      <!-- Schedule Submit Button -->
+      <div class="pt-1">
+        <button id="schedule-btn" type="button" disabled onclick="scheduleCapsule()" 
+          class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md">
+          <i class="fa-solid fa-phone-arrow-up-right text-base"></i>
+          <span id="schedule-btn-text">タイムカプセル電話を予約する</span>
+        </button>
       </div>
 
+      <!-- Toast Feedback -->
+      <div id="scheduled-toast" class="hidden p-3.5 rounded-xl bg-emerald-950/90 border border-emerald-500/60 text-emerald-200 text-xs text-center space-y-1 shadow-lg">
+        <div class="font-bold flex items-center justify-center space-x-1.5">
+          <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+          <span id="scheduled-toast-title">タイムカプセルを着信予約しました！</span>
+        </div>
+        <p id="scheduled-toast-time" class="text-xs text-emerald-300/90"></p>
+      </div>
+
+    </section>
+
+    <!-- Tab 2: Received & Scheduled Capsules History View -->
+    <section id="view-history" class="hidden space-y-3 pb-20">
+      <div class="flex items-center justify-between pb-1">
+        <h2 class="text-sm font-bold text-purple-200 flex items-center gap-1.5">
+          <i class="fa-solid fa-box-archive text-purple-400"></i>
+          <span>タイムカプセル一覧</span>
+        </h2>
+        <span id="capsule-count-badge" class="text-xs bg-slate-800 text-purple-300 px-2.5 py-0.5 rounded-full border border-slate-700">0件</span>
+      </div>
+
+      <div id="capsule-list-container" class="space-y-2.5">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Tab Navigation Bar -->
+  <nav class="fixed bottom-0 left-0 right-0 h-16 bg-[#111827]/95 border-t border-slate-800/80 backdrop-blur-md flex items-center justify-around z-20 max-w-md mx-auto">
+    <button id="nav-btn-create" type="button" onclick="switchMainTab('create')" class="flex flex-col items-center justify-center w-full h-full text-purple-400 transition-colors">
+      <i class="fa-solid fa-phone-volume text-lg"></i>
+      <span class="text-[11px] font-semibold mt-1">カプセル録音</span>
+    </button>
+    <button id="nav-btn-history" type="button" onclick="switchMainTab('history')" class="flex flex-col items-center justify-center w-full h-full text-slate-400 hover:text-purple-300 transition-colors">
+      <i class="fa-solid fa-clock-rotate-left text-lg"></i>
+      <span class="text-[11px] font-semibold mt-1">届いた通話</span>
+    </button>
+  </nav>
+
+  <!-- Fullscreen Incoming Call Screen -->
+  <div id="incoming-call-modal" class="fixed inset-0 bg-[#0B0F19] z-50 hidden flex flex-col justify-between p-8 text-center">
+    <div class="pt-12 space-y-4">
+      <div class="relative inline-block">
+        <div class="w-28 h-28 rounded-full overflow-hidden bg-slate-800 border-4 border-purple-400 shadow-2xl mx-auto flex items-center justify-center">
+          <img id="incoming-avatar" src="icon.png" alt="Caller Avatar" class="w-full h-full object-cover">
+        </div>
+        <div class="absolute inset-0 rounded-full border-2 border-purple-400/50 calling-wave -z-10"></div>
+      </div>
+      <div>
+        <p class="text-xs uppercase tracking-widest text-purple-300 font-bold mb-1">Ourie タイムカプセル着信</p>
+        <h2 id="incoming-caller-name" class="text-2xl font-extrabold text-white">過去の自分</h2>
+        <p id="incoming-subtext" class="text-xs text-slate-400 mt-1">あなた宛ての音声カプセルが届きました</p>
+      </div>
     </div>
 
-    <!-- Bottom Navigation Tabs -->
-    <div class="absolute bottom-0 left-0 right-0 h-16 bg-[#0F172A] border-t border-slate-800/80 flex justify-around items-center px-6 z-10">
-      <button id="nav-record" type="button" onclick="switchTab('record')" class="flex flex-col items-center space-y-1 text-[#A78BFA]">
-        <i class="fa-solid fa-microphone text-lg"></i>
-        <span class="text-xs font-semibold">カプセル作成</span>
+    <!-- Call Response Buttons -->
+    <div class="pb-10 flex items-center justify-around max-w-xs mx-auto w-full">
+      <!-- Decline -->
+      <div class="flex flex-col items-center space-y-2">
+        <button type="button" onclick="declineIncomingCall()" class="w-16 h-16 rounded-full bg-red-600 text-white flex items-center justify-center text-xl shadow-lg active:scale-95 transition">
+          <i class="fa-solid fa-phone-slash"></i>
+        </button>
+        <span class="text-xs text-slate-400 font-medium">拒否</span>
+      </div>
+
+      <!-- Accept -->
+      <div class="flex flex-col items-center space-y-2">
+        <button type="button" onclick="acceptIncomingCall()" class="w-16 h-16 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xl shadow-lg pulse-animation active:scale-95 transition">
+          <i class="fa-solid fa-phone"></i>
+        </button>
+        <span class="text-xs text-emerald-400 font-bold">応答する</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fullscreen Active In-Call Screen -->
+  <div id="active-call-modal" class="fixed inset-0 bg-[#0B0F19] z-50 hidden flex flex-col justify-between p-8 text-center">
+    <div class="pt-12 space-y-4">
+      <div class="w-24 h-24 rounded-full overflow-hidden bg-slate-800 border-2 border-purple-400/80 shadow-xl mx-auto flex items-center justify-center">
+        <img id="active-call-avatar" src="icon.png" alt="In-call Avatar" class="w-full h-full object-cover">
+      </div>
+      <div>
+        <h2 id="active-call-name" class="text-xl font-bold text-white">過去の自分</h2>
+        <p id="active-call-duration" class="text-xs text-purple-300 font-mono mt-1">00:00</p>
+        <p id="active-call-routing-status" class="text-[11px] text-slate-400 mt-0.5">受話器（耳あて）モード通話中</p>
+      </div>
+    </div>
+
+    <!-- Live Audio Animation Visualizer -->
+    <div class="py-6 flex items-center justify-center space-x-2">
+      <span class="w-1.5 h-6 bg-purple-500 rounded-full animate-pulse"></span>
+      <span class="w-1.5 h-12 bg-indigo-400 rounded-full animate-pulse"></span>
+      <span class="w-1.5 h-8 bg-purple-400 rounded-full animate-pulse"></span>
+      <span class="w-1.5 h-14 bg-purple-500 rounded-full animate-pulse"></span>
+      <span class="w-1.5 h-6 bg-indigo-500 rounded-full animate-pulse"></span>
+    </div>
+
+    <!-- In-Call Actions -->
+    <div class="pb-10 space-y-4 max-w-xs mx-auto w-full">
+      <!-- Reply voice recorder button -->
+      <button id="reply-record-btn" type="button" onclick="toggleReplyRecording()" 
+        class="w-full py-2.5 px-4 rounded-xl bg-slate-800/90 border border-purple-500/40 text-xs font-semibold text-purple-300 flex items-center justify-center space-x-2 hover:bg-slate-700 transition">
+        <i id="reply-record-icon" class="fa-solid fa-microphone text-sm"></i>
+        <span id="reply-record-label">あの頃の自分へ返信音声を残す</span>
       </button>
-      <button id="nav-history" type="button" onclick="switchTab('history')" class="flex flex-col items-center space-y-1 text-slate-400">
-        <i class="fa-solid fa-clock-rotate-left text-lg"></i>
-        <span class="text-xs font-semibold">着信一覧・履歴</span>
+
+      <!-- End Call Button -->
+      <div class="flex justify-center pt-2">
+        <button type="button" onclick="endCurrentCall()" class="w-16 h-16 rounded-full bg-red-600 text-white flex items-center justify-center text-xl shadow-lg active:scale-95 transition">
+          <i class="fa-solid fa-phone-slash"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pattern-B: Photo Reveal Modal (Opens right after call ends) -->
+  <div id="photo-reveal-modal" class="fixed inset-0 bg-black/95 z-50 hidden flex flex-col justify-between p-5 backdrop-blur-md">
+    <div class="pt-4 flex items-center justify-between">
+      <div class="text-left">
+        <p class="text-xs text-purple-300 font-bold uppercase tracking-wider">タイムカプセル開封</p>
+        <h3 id="reveal-sender-title" class="text-base font-bold text-white">過去の自分からの写真</h3>
+      </div>
+      <button type="button" onclick="closePhotoRevealModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center">
+        <i class="fa-solid fa-xmark text-sm"></i>
       </button>
     </div>
 
-    <div id="call-overlay" class="hidden absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-black z-50 p-6 flex flex-col justify-between items-center text-center">
-      
-      <!-- Top Call Header / Profile Info -->
-      <div class="mt-8 space-y-4 w-full flex flex-col items-center">
-        <div class="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 border-purple-400/50 shadow-2xl shadow-indigo-500/30 bg-slate-800 flex items-center justify-center">
-          <img id="call-avatar-img" src="icon.png" alt="Caller Avatar" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
-        </div>
-        
-        <div>
-          <h3 id="call-sender-name" class="text-2xl font-bold text-white tracking-wide">過去の自分</h3>
-          <p id="call-status-text" class="text-sm text-[#A78BFA] mt-1.5 font-medium tracking-wider">過去からの着信...</p>
-        </div>
-
-        <!-- Speaker Output Toggle Button (Call Screen) -->
-        <div id="speaker-toggle-container" class="hidden pt-2">
-          <button id="speaker-toggle-btn" type="button" onclick="toggleGlobalSpeakerMode()" 
-            class="px-4 py-2 bg-slate-800/90 hover:bg-slate-700 text-purple-300 text-xs font-semibold rounded-full border border-purple-500/40 inline-flex items-center space-x-2 shadow-md transition-all active:scale-95 cursor-pointer">
-            <i id="call-speaker-icon" class="fa-solid fa-phone-volume text-sm"></i>
-            <span id="call-speaker-text">受話器（耳あて）モード</span>
-          </button>
-        </div>
-      </div>
-
-      <div id="reply-area" class="hidden w-full max-w-xs bg-slate-900/90 border border-slate-700/80 rounded-2xl p-4 space-y-2.5 text-center my-auto shadow-xl">
-        <div class="flex items-center justify-center space-x-1.5 text-xs text-purple-300 font-bold">
-          <i class="fa-solid fa-reply text-xs"></i>
-          <span>当時の自分へ返答を録音</span>
-        </div>
-        <p id="reply-status" class="text-xs text-slate-400">マイクボタンを押して返答を吹き込む</p>
-        
-        <div class="flex justify-center items-center space-x-3 pt-1">
-          <button id="reply-mic-btn" type="button" onclick="toggleReplyRecording()" 
-            class="w-12 h-12 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-md active:scale-95 transition-all cursor-pointer">
-            <i id="reply-mic-icon" class="fa-solid fa-microphone text-base"></i>
-          </button>
-
-          <button id="reply-play-btn" type="button" onclick="playReplyPreview()" class="hidden px-3 py-2 bg-slate-800 text-purple-300 text-xs font-semibold rounded-xl flex items-center space-x-1.5 border border-purple-500/30 cursor-pointer">
-            <i id="reply-play-icon" class="fa-solid fa-play text-xs"></i>
-            <span id="reply-play-text">返答を確認</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Call Action Buttons -->
-      <div class="mb-8 flex justify-center items-center space-x-12 w-full">
-        <button id="end-call-btn" type="button" onclick="endCall()" class="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/40 active:scale-95 transition-all cursor-pointer">
-          <i class="fa-solid fa-phone-slash text-2xl"></i>
-        </button>
-        <button id="accept-call-btn" type="button" onclick="acceptCall()" class="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40 animate-bounce active:scale-95 transition-all cursor-pointer">
-          <i class="fa-solid fa-phone text-2xl"></i>
-        </button>
-      </div>
+    <!-- Photo Container keeping natural aspect ratio without cropping -->
+    <div class="flex-1 flex items-center justify-center py-4">
+      <img id="reveal-photo-img" src="" alt="Revealed Memory Photo" 
+        class="max-h-[70vh] max-w-full w-auto h-auto object-contain rounded-xl shadow-2xl border border-slate-700">
     </div>
 
-    <div id="memory-reveal-modal" class="hidden fixed inset-0 bg-black/95 backdrop-blur-lg z-50 flex items-center justify-center p-4">
-      <div class="bg-gradient-to-b from-slate-900 to-[#13111C] border border-purple-500/50 w-full max-w-sm rounded-[32px] p-5 space-y-4 shadow-2xl text-center fade-in-scale">
-        
-        <div class="space-y-1">
-          <div class="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-500/40 text-[11px] font-bold text-purple-300">
-            <i class="fa-solid fa-box-open text-xs"></i>
-            <span>タイムカプセル開封</span>
-          </div>
-          <h3 class="text-lg font-bold text-white tracking-wide">当時の思い出の写真</h3>
-          <p id="memory-reveal-subtitle" class="text-xs text-purple-200">通話終了後に届いたメッセージ写真です</p>
-        </div>
-
-        <div class="relative w-full max-h-[58vh] bg-slate-950/80 rounded-2xl overflow-hidden border-2 border-purple-400/40 shadow-2xl flex items-center justify-center p-1.5">
-          <img id="reveal-photo-img" src="" alt="Memory Photo" class="max-w-full max-h-[54vh] w-auto h-auto object-contain rounded-xl shadow-inner">
-          <div id="reveal-photo-placeholder" class="hidden text-slate-500 text-center p-6">
-            <i class="fa-regular fa-image text-3xl mb-2"></i>
-            <p class="text-xs">写真の添付はありませんでした</p>
-          </div>
-        </div>
-
-        <button type="button" onclick="closeMemoryRevealModal()" 
-          class="w-full py-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-sm rounded-2xl shadow-lg shadow-purple-600/30 transition-all cursor-pointer">
-          思い出をとじる
-        </button>
-      </div>
+    <div class="pb-4 space-y-2 text-center">
+      <p id="reveal-photo-date" class="text-xs text-slate-400"></p>
+      <button type="button" onclick="closePhotoRevealModal()" class="w-full py-3 bg-[#7C3AED] hover:bg-purple-600 text-white text-xs font-bold rounded-xl shadow-md transition">
+        写真と音声を保存して閉じる
+      </button>
     </div>
-
   </div>
 
   <script>
+    // State management
     let isRecording = false;
     let recordedAudioBlob = null;
     let audioUrl = null;
@@ -328,6 +423,8 @@
 
     let userAvatarData = null;
     let userName = "過去の自分";
+    let myUserId = "";
+    let targetMode = "self"; // "self" or "friend"
     let isSpeakerMode = false;
 
     let currentAudioElement = null;
@@ -336,10 +433,13 @@
     let currentPlayingUrl = null;
     let currentOnEndedHandler = null;
 
-    // Background timer to monitor reserved capsules
     let capsuleMonitorInterval = null;
+    let db = null; // Firestore instance for multi-device sync
 
     window.onload = () => {
+      initMyUserId();
+      initFirebaseIfConfigured();
+
       const savedAvatar = localStorage.getItem('ourie_user_avatar');
       const savedName = localStorage.getItem('ourie_user_name');
       const savedCapsules = localStorage.getItem('ourie_saved_capsules');
@@ -361,54 +461,175 @@
         }
       }
 
-      setQuickTestTime(60); // Default to 1 minute from now
+      setQuickTestTime(60); // Default to 1 min
       renderCapsules();
       updateSpeakerUI();
-
-      // Start ticker to trigger incoming calls
+      updateTargetUI();
       startCapsuleMonitoring();
     };
 
-    function setQuickTestTime(secondsFromNow) {
-      const target = new Date(Date.now() + secondsFromNow * 1000);
-      const localDatetime = new Date(target.getTime() - (target.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-      const dateInput = document.getElementById('datetime-input');
-      if (dateInput) dateInput.value = localDatetime;
-    }
-
-    function startCapsuleMonitoring() {
-      if (capsuleMonitorInterval) clearInterval(capsuleMonitorInterval);
-      capsuleMonitorInterval = setInterval(() => {
-        if (activeCallingCapsule) return; // Already on call
-
-        const now = Date.now();
-        for (let i = 0; i < capsules.length; i++) {
-          const cap = capsules[i];
-          if (cap.status === 'scheduled' && cap.targetTimestamp <= now) {
-            cap.status = 'delivered';
-            saveCapsulesToStorage();
-            renderCapsules();
-            triggerIncomingCall(cap);
-            break;
-          }
-        }
-      }, 1000);
-    }
-
-    function saveCapsulesToStorage() {
-      try {
-        localStorage.setItem('ourie_saved_capsules', JSON.stringify(capsules));
-      } catch(e) {
-        console.warn("Storage save error:", e);
+    function initMyUserId() {
+      let storedId = localStorage.getItem('ourie_my_user_id');
+      if (!storedId) {
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        storedId = `OU-${randomNum}`;
+        localStorage.setItem('ourie_my_user_id', storedId);
       }
+      myUserId = storedId;
+      const displayEl = document.getElementById('my-user-id-display');
+      if (displayEl) displayEl.innerText = myUserId;
+    }
+
+    function copyMyUserId() {
+      if (!myUserId) return;
+      const input = document.createElement('input');
+      input.value = myUserId;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+
+      const displayEl = document.getElementById('my-user-id-display');
+      if (displayEl) {
+        const prevText = displayEl.innerText;
+        displayEl.innerText = "コピー完了!";
+        setTimeout(() => {
+          displayEl.innerText = myUserId;
+        }, 1500);
+      }
+    }
+
+    function switchMainTab(tab) {
+      const viewCreate = document.getElementById('view-create');
+      const viewHistory = document.getElementById('view-history');
+      const btnCreate = document.getElementById('nav-btn-create');
+      const btnHistory = document.getElementById('nav-btn-history');
+
+      if (tab === 'create') {
+        viewCreate.classList.remove('hidden');
+        viewHistory.classList.add('hidden');
+        btnCreate.className = "flex flex-col items-center justify-center w-full h-full text-purple-400 transition-colors";
+        btnHistory.className = "flex flex-col items-center justify-center w-full h-full text-slate-400 hover:text-purple-300 transition-colors";
+      } else {
+        viewCreate.classList.add('hidden');
+        viewHistory.classList.remove('hidden');
+        btnHistory.className = "flex flex-col items-center justify-center w-full h-full text-purple-400 transition-colors";
+        btnCreate.className = "flex flex-col items-center justify-center w-full h-full text-slate-400 hover:text-purple-300 transition-colors";
+        renderCapsules();
+      }
+    }
+
+    function toggleSpeakerMode() {
+      isSpeakerMode = !isSpeakerMode;
+      updateSpeakerUI();
+      if (currentAudioElement) {
+        applySpeakerRoutingToElement(currentAudioElement, isSpeakerMode);
+      }
+    }
+
+    function updateSpeakerUI() {
+      const icon = document.getElementById('speaker-icon');
+      const label = document.getElementById('speaker-status-label');
+      const banner = document.getElementById('speaker-banner-text');
+
+      if (isSpeakerMode) {
+        icon.className = "fa-solid fa-volume-high text-xs";
+        label.innerText = "本体スピーカー";
+        if (banner) {
+          banner.innerHTML = "現在本体スピーカーモードです。<br>耳を近づけずにそのまま音声をお聴きいただけます。";
+        }
+      } else {
+        icon.className = "fa-solid fa-phone text-xs";
+        label.innerText = "受話器（耳あて）";
+        if (banner) {
+          banner.innerHTML = "スマホを耳に当てて通話感覚でお聴きいただけます。<br>右上ボタンで本体スピーカーへ即座に切り替え可能です。";
+        }
+      }
+    }
+
+    function setTargetMode(mode) {
+      targetMode = mode;
+      updateTargetUI();
+    }
+
+    function updateTargetUI() {
+      const selfBtn = document.getElementById('target-mode-self-btn');
+      const friendBtn = document.getElementById('target-mode-friend-btn');
+      const friendContainer = document.getElementById('friend-id-container');
+      const scheduleBtnText = document.getElementById('schedule-btn-text');
+
+      if (targetMode === 'self') {
+        selfBtn.className = "py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 bg-[#7C3AED] text-white border border-purple-400/50 shadow transition-all cursor-pointer";
+        friendBtn.className = "py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition-all cursor-pointer";
+        friendContainer.classList.add('hidden');
+        if (scheduleBtnText) scheduleBtnText.innerText = "未来の自分へタイムカプセルを予約する";
+      } else {
+        friendBtn.className = "py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 bg-[#7C3AED] text-white border border-purple-400/50 shadow transition-all cursor-pointer";
+        selfBtn.className = "py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition-all cursor-pointer";
+        friendContainer.classList.remove('hidden');
+        if (scheduleBtnText) scheduleBtnText.innerText = "友達へタイムカプセル電話を予約する";
+      }
+    }
+
+    function initFirebaseIfConfigured() {
+      const configStr = localStorage.getItem('ourie_firebase_config');
+      if (configStr) {
+        try {
+          const cfg = JSON.parse(configStr);
+          if (!firebase.apps.length) {
+            firebase.initializeApp(cfg);
+          }
+          db = firebase.firestore();
+          listenForFriendCapsules();
+        } catch(e) {
+          console.warn("Firebase initialization skipped:", e);
+        }
+      }
+    }
+
+    function listenForFriendCapsules() {
+      if (!db || !myUserId) return;
+      db.collection("capsules")
+        .where("recipientId", "==", myUserId.toUpperCase().trim())
+        .onSnapshot((snapshot) => {
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+              const data = change.doc.data();
+              if (!capsules.some(c => c.remoteId === change.doc.id)) {
+                const newCap = {
+                  id: Date.now() + Math.floor(Math.random() * 1000),
+                  remoteId: change.doc.id,
+                  senderName: data.senderName || '友達',
+                  senderAvatar: data.senderAvatar || null,
+                  photoData: data.photoData || null,
+                  audioUrl: data.audioUrl,
+                  targetTimestamp: data.targetTimestamp,
+                  targetTimeText: new Date(data.targetTimestamp).toLocaleString('ja-JP', { 
+                    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                  }),
+                  status: 'scheduled',
+                  isFromFriend: true
+                };
+                capsules.unshift(newCap);
+                saveCapsulesToStorage();
+                renderCapsules();
+              }
+            }
+          });
+        }, (err) => console.warn("Firestore listen error:", err));
+    }
+
+    function handleNameChange(val) {
+      userName = val.trim() || "過去の自分";
+      localStorage.setItem('ourie_user_name', userName);
+      document.getElementById('header-user-name').innerText = userName;
     }
 
     function handleAvatarUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
-
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = (e) => {
         userAvatarData = e.target.result;
         localStorage.setItem('ourie_user_avatar', userAvatarData);
         updateAvatarDisplay(userAvatarData);
@@ -416,396 +637,200 @@
       reader.readAsDataURL(file);
     }
 
-    function updateAvatarDisplay(avatarSrc) {
-      if (!avatarSrc) return;
-      const previewImg = document.getElementById('profile-avatar-preview');
-      const headerImg = document.getElementById('header-avatar-img');
-      const callAvatarImg = document.getElementById('call-avatar-img');
-
-      if (previewImg) previewImg.src = avatarSrc;
-      if (headerImg) headerImg.src = avatarSrc;
-      if (callAvatarImg) callAvatarImg.src = avatarSrc;
-    }
-
-    function handleNameChange(val) {
-      userName = val.trim() || '過去の自分';
-      localStorage.setItem('ourie_user_name', userName);
-      document.getElementById('header-user-name').innerText = userName;
+    function updateAvatarDisplay(dataUrl) {
+      const p1 = document.getElementById('profile-avatar-preview');
+      const p2 = document.getElementById('header-avatar-img');
+      if (p1) p1.src = dataUrl;
+      if (p2) p2.src = dataUrl;
     }
 
     function handleMemoryPhotoUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
 
-      const img = new Image();
       const reader = new FileReader();
       reader.onload = (e) => {
-        img.src = e.target.result;
+        // Compress while preserving aspect ratio
+        const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const maxDim = 800; // 解像度を高め、撮った写真の綺麗さを保持
-          if (width > height && width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
+          const maxDim = 800; // High resolution preserving ratio
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
           }
+
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
+          memoryPhotoData = canvas.toDataURL('image/jpeg', 0.8);
 
-          memoryPhotoData = canvas.toDataURL('image/jpeg', 0.75);
-          document.getElementById('memory-photo-preview').src = memoryPhotoData;
-          document.getElementById('memory-photo-preview-wrap').classList.remove('hidden');
-          document.getElementById('photo-btn-text').innerText = "写真を変更する";
+          // Display in UI
+          document.getElementById('photo-placeholder-content').classList.add('hidden');
+          const previewImg = document.getElementById('photo-preview-img');
+          previewImg.src = memoryPhotoData;
+          document.getElementById('photo-preview-wrapper').classList.remove('hidden');
         };
+        img.src = e.target.result;
       };
       reader.readAsDataURL(file);
     }
 
-    function removeMemoryPhoto() {
+    function removeMemoryPhoto(event) {
+      if (event) event.stopPropagation();
       memoryPhotoData = null;
-      document.getElementById('memory-photo-preview').src = "";
-      document.getElementById('memory-photo-preview-wrap').classList.add('hidden');
-      document.getElementById('photo-btn-text').innerText = "写真を選択・撮影する";
-      document.getElementById('memory-photo-input').value = "";
+      document.getElementById('memory-photo-input').value = '';
+      document.getElementById('photo-preview-wrapper').classList.add('hidden');
+      document.getElementById('photo-placeholder-content').classList.remove('hidden');
     }
 
-    function toggleGlobalSpeakerMode() {
-      isSpeakerMode = !isSpeakerMode;
-      updateSpeakerUI();
-
-      if (currentAudioElement || activeAudioSource) {
-        applyCurrentAudioRoute();
-      }
-    }
-
-    function updateSpeakerUI() {
-      const globalBtn = document.getElementById('global-speaker-toggle-btn');
-      const globalIcon = document.getElementById('global-speaker-icon');
-      const globalText = document.getElementById('global-speaker-text');
-
-      const bannerText = document.getElementById('banner-output-mode-text');
-      const bannerSubtext = document.getElementById('banner-subtext');
-      const bannerIcon = document.getElementById('banner-mode-icon');
-      const callText = document.getElementById('call-speaker-text');
-      const callIcon = document.getElementById('call-speaker-icon');
-
-      if (isSpeakerMode) {
-        if (globalIcon) globalIcon.className = "fa-solid fa-volume-high text-xs text-amber-300";
-        if (globalText) globalText.innerText = "本体スピーカー";
-        if (globalBtn) globalBtn.className = "px-3 py-1.5 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-500/50 rounded-full flex items-center space-x-2 transition-all cursor-pointer active:scale-95 shadow-sm";
-
-        if (bannerText) bannerText.innerText = "再生出力を「本体スピーカー」に設定中";
-        if (bannerSubtext) bannerSubtext.innerHTML = "周囲に聞こえる本体スピーカーから再生されます。<br>受話器に変更する場合はボタンを押してください。";
-        if (bannerIcon) bannerIcon.className = "fa-solid fa-volume-high text-xs text-amber-300";
-
-        if (callText) callText.innerText = "本体スピーカーモード";
-        if (callIcon) callIcon.className = "fa-solid fa-volume-high text-sm text-amber-300";
-      } else {
-        if (globalIcon) globalIcon.className = "fa-solid fa-phone-volume text-xs text-[#A78BFA]";
-        if (globalText) globalText.innerText = "受話器 (耳あて)";
-        if (globalBtn) globalBtn.className = "px-3 py-1.5 bg-[#1E293B] hover:bg-slate-800 border border-purple-500/40 rounded-full flex items-center space-x-2 transition-all cursor-pointer active:scale-95 shadow-sm";
-
-        if (bannerText) bannerText.innerText = "再生出力を「耳あて通話スピーカー」に設定中";
-        if (bannerSubtext) bannerSubtext.innerHTML = "スマホを耳に当てて通話感覚でお聴きいただけます。<br>右上ボタンで本体スピーカーへ即座に切り替え可能です。";
-        if (bannerIcon) bannerIcon.className = "fa-solid fa-ear-listen text-xs text-[#A78BFA]";
-
-        if (callText) callText.innerText = "受話器（耳あて）モード";
-        if (callIcon) callIcon.className = "fa-solid fa-phone-volume text-sm text-purple-300";
-      }
-    }
-
-    function forceEarpieceAudioCycle() {
-      if (!isSpeakerMode) {
-        setNativeAudioMode('SPEAKER');
-        setTimeout(() => setNativeAudioMode('EARPIECE'), 30);
-        setTimeout(() => setNativeAudioMode('EARPIECE'), 120);
-        setTimeout(() => setNativeAudioMode('EARPIECE'), 300);
-      } else {
-        setNativeAudioMode('SPEAKER');
-      }
-    }
-
-    async function applyCurrentAudioRoute(audioEl = currentAudioElement) {
-      const mode = isSpeakerMode ? 'SPEAKER' : 'EARPIECE';
-      setNativeAudioMode(mode);
-
-      if (audioEl && typeof audioEl.setSinkId === 'function') {
-        try {
-          if (!isSpeakerMode) {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const earpiece = devices.find(d => 
-              d.kind === 'audiooutput' && 
-              (d.label.toLowerCase().includes('earpiece') || 
-               d.label.toLowerCase().includes('receiver') || 
-               d.label.toLowerCase().includes('telephony') || 
-               d.deviceId === 'communications')
-            );
-            if (earpiece) {
-              await audioEl.setSinkId(earpiece.deviceId);
-            } else if (devices.some(d => d.deviceId === 'communications')) {
-              await audioEl.setSinkId('communications');
-            }
-          } else {
-            await audioEl.setSinkId('');
-          }
-        } catch(e) {
-          console.warn("setSinkId route error:", e);
-        }
-      }
-    }
-
-    function setNativeAudioMode(mode) {
-      if (window.AudioToggle && typeof window.AudioToggle.setAudioMode === 'function') {
-        try {
-          if (mode === 'EARPIECE') {
-            window.AudioToggle.setAudioMode(window.AudioToggle.EARPIECE);
-          } else if (mode === 'SPEAKER') {
-            window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
-          } else {
-            window.AudioToggle.setAudioMode(window.AudioToggle.NORMAL);
-          }
-        } catch (e) {
-          console.warn("AudioToggle plugin error:", e);
-        }
-      }
-    }
-
-    function stopCurrentAudio() {
-      if (currentAudioElement) {
-        try {
-          currentAudioElement.pause();
-          currentAudioElement.currentTime = 0;
-        } catch(e){}
-        currentAudioElement = null;
-      }
-      if (activeAudioSource) {
-        try { activeAudioSource.stop(); } catch(e){}
-        activeAudioSource = null;
-      }
-      if (activeAudioCtx) {
-        try { activeAudioCtx.close(); } catch(e){}
-        activeAudioCtx = null;
-      }
-
-      currentPlayingUrl = null;
-      setNativeAudioMode('NORMAL');
-
-      if (currentOnEndedHandler) {
-        const handler = currentOnEndedHandler;
-        currentOnEndedHandler = null;
-        handler();
-      }
-    }
-
-    async function playAudioWithEarpieceRouting(url, onEnded) {
-      if (currentPlayingUrl === url) {
-        stopCurrentAudio();
-        return;
-      }
-
-      stopCurrentAudio();
-      currentPlayingUrl = url;
-      currentOnEndedHandler = onEnded;
-
-      const audio = new Audio(url);
-      currentAudioElement = audio;
-
-      await applyCurrentAudioRoute(audio);
-
-      audio.onended = () => {
-        stopCurrentAudio();
-      };
-
-      audio.onerror = (e) => {
-        console.warn("HTMLAudioElement failed, attempting Web Audio fallback:", e);
-        playAudioWithWebAudioFallback(url, onEnded);
-      };
-
-      audio.onplaying = () => {
-        forceEarpieceAudioCycle();
-      };
-
-      try {
-        await audio.play();
-        forceEarpieceAudioCycle();
-      } catch (err) {
-        console.warn("Audio play blocked, fallback:", err);
-        playAudioWithWebAudioFallback(url, onEnded);
-      }
-    }
-
-    async function playAudioWithWebAudioFallback(url, onEnded) {
-      try {
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
-
-        activeAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const decodedData = await activeAudioCtx.decodeAudioData(arrayBuffer);
-
-        activeAudioSource = activeAudioCtx.createBufferSource();
-        activeAudioSource.buffer = decodedData;
-        activeAudioSource.connect(activeAudioCtx.destination);
-
-        activeAudioSource.onended = () => {
-          stopCurrentAudio();
-        };
-
-        activeAudioSource.start(0);
-        forceEarpieceAudioCycle();
-      } catch(err) {
-        console.error("WebAudio play failed:", err);
-        stopCurrentAudio();
-      }
-    }
-
-    function stopActiveStream() {
-      if (currentStream) {
-        try {
-          currentStream.getTracks().forEach(track => track.stop());
-        } catch(e) {}
-        currentStream = null;
-      }
-    }
-
-    async function getAudioStream() {
-      const constraintsList = [
-        { audio: true },
-        { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } },
-        { audio: { channelCount: 1 } },
-        { audio: { sampleRate: 44100 } }
-      ];
-
-      let lastError = null;
-      for (const constraints of constraintsList) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia(constraints);
-          if (stream && stream.getAudioTracks().length > 0) return stream;
-        } catch (err) {
-          lastError = err;
-        }
-      }
-      throw lastError || new Error("マイクを起動できませんでした");
-    }
-
-    async function startOrStopRecording() {
-      const micBtn = document.getElementById('mic-btn');
-      const micIcon = document.getElementById('mic-icon');
-      const micStatus = document.getElementById('mic-status');
-      const previewContainer = document.getElementById('preview-container');
-
-      stopCurrentAudio();
-
+    async function toggleRecording() {
       if (!isRecording) {
-        micStatus.innerText = "マイクを起動中...";
-
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          micStatus.innerText = "お使いの環境はマイク録音に未対応です";
-          return;
-        }
-
-        stopActiveStream();
-
         try {
-          currentStream = await getAudioStream();
+          currentStream = await navigator.mediaDevices.getUserMedia({ audio: true });
           audioChunks = [];
+          mediaRecorder = new MediaRecorder(currentStream);
 
-          let options = {};
-          if (typeof MediaRecorder !== 'undefined') {
-            if (MediaRecorder.isTypeSupported('audio/webm')) {
-              options = { mimeType: 'audio/webm' };
-            } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-              options = { mimeType: 'audio/mp4' };
-            } else if (MediaRecorder.isTypeSupported('audio/aac')) {
-              options = { mimeType: 'audio/aac' };
-            }
-          }
-
-          mediaRecorder = new MediaRecorder(currentStream, options);
-
-          mediaRecorder.ondataavailable = event => {
-            if (event.data && event.data.size > 0) audioChunks.push(event.data);
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunks.push(e.data);
           };
 
           mediaRecorder.onstop = () => {
-            const mimeType = (mediaRecorder && mediaRecorder.mimeType) ? mediaRecorder.mimeType : 'audio/mp4';
-            recordedAudioBlob = new Blob(audioChunks, { type: mimeType });
+            recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
             audioUrl = URL.createObjectURL(recordedAudioBlob);
 
             const reader = new FileReader();
             reader.onloadend = () => {
               audioBase64Data = reader.result;
+              enableScheduleButton(true);
             };
             reader.readAsDataURL(recordedAudioBlob);
 
-            if (previewContainer) previewContainer.classList.remove('hidden');
-            enableSubmitButtons();
-            stopActiveStream();
+            showPlaybackPreviewBox();
           };
 
-          mediaRecorder.start(100);
+          mediaRecorder.start();
           isRecording = true;
-          micBtn.className = "w-14 h-14 rounded-full bg-red-500 text-white flex items-center justify-center mx-auto pulse-animation cursor-pointer";
-          micIcon.className = "fa-solid fa-square text-xl";
-          micStatus.innerText = "録音中... タップで停止";
+          updateRecordingUI(true);
+          startRecordingTimer();
         } catch (err) {
-          console.error("録音起動エラー:", err);
-          isRecording = false;
-          stopActiveStream();
-          micBtn.className = "w-14 h-14 rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white flex items-center justify-center mx-auto shadow-lg shadow-[#7C3AED]/40 active:scale-95 cursor-pointer";
-          micIcon.className = "fa-solid fa-microphone text-xl";
-          micStatus.innerText = "エラー: " + (err.name || "マイクを開けません");
+          console.error("Mic access error:", err);
+          document.getElementById('mic-status').innerText = "マイクへのアクセスを許可してください";
         }
       } else {
-        try {
-          if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-        } catch (e) {}
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+        }
+        if (currentStream) {
+          currentStream.getTracks().forEach(track => track.stop());
+        }
         isRecording = false;
-        micBtn.className = "w-14 h-14 rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white flex items-center justify-center mx-auto shadow-lg shadow-[#7C3AED]/40 active:scale-95 cursor-pointer";
-        micIcon.className = "fa-solid fa-microphone text-xl";
-        micStatus.innerText = "録音完了！再生確認または予約できます";
+        updateRecordingUI(false);
+        stopRecordingTimer();
       }
     }
 
-    function playPreview() {
-      const previewIcon = document.getElementById('preview-icon');
-      const previewText = document.getElementById('preview-text');
-      const previewPlayBtn = document.getElementById('preview-play-btn');
+    function updateRecordingUI(recording) {
+      const btn = document.getElementById('record-btn');
+      const icon = document.getElementById('record-btn-icon');
+      const status = document.getElementById('mic-status');
 
-      if (!audioUrl) return;
-
-      if (currentPlayingUrl === audioUrl) {
-        stopCurrentAudio();
-        previewIcon.className = "fa-solid fa-play text-xs text-purple-200";
-        previewText.innerText = "録音を再生確認";
-        previewPlayBtn.className = "px-3 py-1.5 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-1.5 border border-purple-400/30 transition-all cursor-pointer";
+      if (recording) {
+        btn.className = "w-20 h-20 rounded-full bg-red-600 text-white flex items-center justify-center text-2xl shadow-lg border-2 border-red-300 pulse-animation";
+        icon.className = "fa-solid fa-stop";
+        status.innerText = "録音中... もう一度タップで完了";
       } else {
-        previewIcon.className = "fa-solid fa-square text-xs text-red-300";
-        previewText.innerText = "再生停止";
-        previewPlayBtn.className = "px-3 py-1.5 bg-red-900/80 hover:bg-red-800 text-white text-xs font-semibold rounded-xl flex items-center space-x-1.5 border border-red-400/40 playing-glow transition-all cursor-pointer";
-
-        playAudioWithEarpieceRouting(audioUrl, () => {
-          previewIcon.className = "fa-solid fa-play text-xs text-purple-200";
-          previewText.innerText = "録音を再生確認";
-          previewPlayBtn.className = "px-3 py-1.5 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-1.5 border border-purple-400/30 transition-all cursor-pointer";
-        });
+        btn.className = "w-20 h-20 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg border-2 border-purple-300/40 active:scale-95 transition-all";
+        icon.className = "fa-solid fa-microphone";
+        status.innerText = "録音完了！";
       }
     }
 
-    function enableSubmitButtons() {
-      const scheduleBtn = document.getElementById('schedule-btn');
-      if (scheduleBtn) {
-        scheduleBtn.disabled = false;
-        scheduleBtn.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-lg shadow-emerald-600/30 cursor-pointer active:scale-95";
+    let recInterval = null;
+    let recSeconds = 0;
+    function startRecordingTimer() {
+      recSeconds = 0;
+      const el = document.getElementById('recording-timer');
+      el.innerText = "00:00";
+      recInterval = setInterval(() => {
+        recSeconds++;
+        const m = String(Math.floor(recSeconds / 60)).padStart(2, '0');
+        const s = String(recSeconds % 60).padStart(2, '0');
+        el.innerText = `${m}:${s}`;
+      }, 1000);
+    }
+
+    function stopRecordingTimer() {
+      if (recInterval) clearInterval(recInterval);
+    }
+
+    function showPlaybackPreviewBox() {
+      const box = document.getElementById('playback-preview-box');
+      box.classList.remove('hidden');
+      const durEl = document.getElementById('preview-audio-duration');
+      const m = String(Math.floor(recSeconds / 60)).padStart(2, '0');
+      const s = String(recSeconds % 60).padStart(2, '0');
+      durEl.innerText = `${m}:${s}`;
+    }
+
+    function playPreviewAudio(forceSpeaker) {
+      if (!audioUrl) return;
+      stopAllPlayingAudio();
+
+      const audio = new Audio(audioUrl);
+      currentAudioElement = audio;
+      applySpeakerRoutingToElement(audio, forceSpeaker);
+      audio.play().catch(e => console.warn("Playback error:", e));
+    }
+
+    function applySpeakerRoutingToElement(audioElement, asSpeaker) {
+      if (audioElement && typeof audioElement.setSinkId === 'function') {
+        navigator.mediaDevices.enumerateDevices().then(devices => {
+          const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+          if (audioOutputs.length > 0) {
+            const target = asSpeaker ? audioOutputs[0] : (audioOutputs[1] || audioOutputs[0]);
+            if (target && target.deviceId) {
+              audioElement.setSinkId(target.deviceId).catch(e => console.warn("Sink ID error:", e));
+            }
+          }
+        }).catch(e => console.warn(e));
       }
     }
 
-    function scheduleCapsuleForSelf() {
+    function setQuickTestTime(secondsFromNow) {
+      const target = new Date(Date.now() + secondsFromNow * 1000);
+      const year = target.getFullYear();
+      const month = String(target.getMonth() + 1).padStart(2, '0');
+      const day = String(target.getDate()).padStart(2, '0');
+      const hours = String(target.getHours()).padStart(2, '0');
+      const minutes = String(target.getMinutes()).padStart(2, '0');
+      const val = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+      const input = document.getElementById('datetime-input');
+      if (input) input.value = val;
+    }
+
+    function enableScheduleButton(enable) {
+      const btn = document.getElementById('schedule-btn');
+      if (enable) {
+        btn.disabled = false;
+        btn.className = "w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-lg active:scale-98 cursor-pointer";
+      } else {
+        btn.disabled = true;
+        btn.className = "w-full py-3.5 bg-slate-800 text-slate-500 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md cursor-not-allowed";
+      }
+    }
+
+    async function scheduleCapsule() {
       if (!audioBase64Data && !audioUrl) return;
 
       const dateInput = document.getElementById('datetime-input').value;
@@ -814,382 +839,377 @@
         month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' 
       });
 
-      const newCapsule = {
-        id: Date.now(),
-        senderName: userName || '過去の自分',
-        senderAvatar: userAvatarData,
-        photoData: memoryPhotoData,
-        audioUrl: audioBase64Data || audioUrl,
-        targetTimestamp: targetTime,
-        targetTimeText: targetFormatted,
-        status: 'scheduled'
-      };
+      if (targetMode === 'friend') {
+        const friendId = document.getElementById('friend-id-input').value.trim().toUpperCase();
+        if (!friendId) {
+          const status = document.getElementById('mic-status');
+          if (status) status.innerText = "お相手のOurie IDを入力してください";
+          return;
+        }
 
-      capsules.unshift(newCapsule);
-      saveCapsulesToStorage();
-      renderCapsules();
+        const capsuleData = {
+          senderId: myUserId,
+          recipientId: friendId,
+          senderName: userName || '友達',
+          senderAvatar: userAvatarData || null,
+          photoData: memoryPhotoData || null,
+          audioUrl: audioBase64Data || audioUrl,
+          targetTimestamp: targetTime,
+          createdAt: Date.now()
+        };
 
-      // Show toast
-      const toast = document.getElementById('scheduled-toast');
-      const toastTime = document.getElementById('scheduled-toast-time');
-      if (toast && toastTime) {
-        toastTime.innerText = `お届け日時: ${targetFormatted} に電話が鳴ります`;
-        toast.classList.remove('hidden');
-        setTimeout(() => {
-          toast.classList.add('hidden');
-        }, 5000);
+        if (db) {
+          try {
+            await db.collection("capsules").add(capsuleData);
+          } catch(e) {
+            console.error("Firestore write failed:", e);
+          }
+        }
+        showScheduleToast(`お相手 (${friendId}) 宛に予約完了！指定日時に相手の電話が鳴ります`);
+      } else {
+        const newCapsule = {
+          id: Date.now(),
+          senderName: userName || '過去の自分',
+          senderAvatar: userAvatarData,
+          photoData: memoryPhotoData,
+          audioUrl: audioBase64Data || audioUrl,
+          targetTimestamp: targetTime,
+          targetTimeText: targetFormatted,
+          status: 'scheduled',
+          isFromFriend: false
+        };
+
+        capsules.unshift(newCapsule);
+        saveCapsulesToStorage();
+        renderCapsules();
+        showScheduleToast(`お届け日時: ${targetFormatted} に電話が鳴ります`);
       }
 
-      // Reset recording form
       resetRecordingForm();
     }
 
+    function showScheduleToast(message) {
+      const toast = document.getElementById('scheduled-toast');
+      const toastTime = document.getElementById('scheduled-toast-time');
+      if (toast && toastTime) {
+        toastTime.innerText = message;
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+          toast.classList.add('hidden');
+        }, 6000);
+      }
+    }
+
     function resetRecordingForm() {
-      isRecording = false;
       recordedAudioBlob = null;
       audioUrl = null;
       audioBase64Data = null;
-      removeMemoryPhoto();
-
-      const previewContainer = document.getElementById('preview-container');
-      if (previewContainer) previewContainer.classList.add('hidden');
-
-      const scheduleBtn = document.getElementById('schedule-btn');
-      if (scheduleBtn) {
-        scheduleBtn.disabled = true;
-        scheduleBtn.className = "w-full py-3 bg-slate-800 text-slate-500 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md";
-      }
-
-      const micStatus = document.getElementById('mic-status');
-      if (micStatus) micStatus.innerText = "マイクボタンを押して音声を吹き込む";
+      memoryPhotoData = null;
+      document.getElementById('playback-preview-box').classList.add('hidden');
+      document.getElementById('photo-preview-wrapper').classList.add('hidden');
+      document.getElementById('photo-placeholder-content').classList.remove('hidden');
+      document.getElementById('mic-status').innerText = "タップして録音を開始";
+      document.getElementById('recording-timer').innerText = "00:00";
+      enableScheduleButton(false);
     }
 
-    function renderCapsules() {
-      const list = document.getElementById('capsule-list');
-      const countEl = document.getElementById('capsule-count');
-      if (!list) return;
-
-      if (countEl) countEl.innerText = `${capsules.length}件`;
-
-      if (capsules.length === 0) {
-        list.innerHTML = `<div class="p-6 text-center bg-[#1E293B]/40 rounded-2xl border border-dashed border-slate-700/60">
-          <i class="fa-solid fa-box-open text-2xl text-slate-500 mb-2"></i>
-          <p class="text-xs text-slate-400">現在セットされているカプセルはありません。</p>
-        </div>`;
-        return;
-      }
-
-      list.innerHTML = capsules.map(c => {
-        const isDelivered = c.status === 'delivered';
-        return `
-          <div class="p-3 bg-[#1E293B] rounded-2xl border border-slate-700/80 space-y-2 shadow-md">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center space-x-2.5">
-                <div class="w-10 h-10 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center text-white shadow border border-purple-500/40 shrink-0">
-                  <img src="${c.senderAvatar || 'icon.png'}" alt="Icon" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
-                </div>
-                <div>
-                  <div class="flex items-center space-x-2">
-                    <p class="text-sm font-bold text-white">${c.senderName}</p>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${isDelivered ? 'bg-purple-950 text-purple-300 border border-purple-500/40' : 'bg-amber-950 text-amber-300 border border-amber-500/40 animate-pulse'}">
-                      ${isDelivered ? '開封済み' : '予約中 (待機)'}
-                    </span>
-                  </div>
-                  <p class="text-xs text-slate-400 mt-0.5">お届け: ${c.targetTimeText}</p>
-                </div>
-              </div>
-              <button type="button" onclick="deleteCapsule(${c.id})" class="text-slate-400 hover:text-red-400 p-2 transition-colors cursor-pointer">
-                <i class="fa-regular fa-trash-can text-sm"></i>
-              </button>
-            </div>
-
-            <div class="flex items-center space-x-2 pt-2 border-t border-slate-800/80">
-              ${isDelivered ? `
-                <button type="button" onclick="playSavedAudio('${c.audioUrl}', this)" class="px-3 py-1.5 bg-[#4C1D95] hover:bg-[#5b21b6] text-white text-xs font-semibold rounded-xl flex items-center space-x-1.5 border border-purple-500/30 transition-all cursor-pointer">
-                  <i class="fa-solid fa-play text-xs"></i>
-                  <span>音声を再生</span>
-                </button>
-                ${c.photoData ? `
-                  <button type="button" onclick="showMemoryPhotoModal('${c.photoData}', '${c.senderName}')" class="px-3 py-1.5 bg-indigo-900/80 hover:bg-indigo-800 text-white text-xs font-semibold rounded-xl flex items-center space-x-1.5 border border-indigo-400/40 transition-all cursor-pointer">
-                    <i class="fa-solid fa-image text-xs"></i>
-                    <span>写真を見る</span>
-                  </button>
-                ` : ''}
-              ` : `
-                <button type="button" onclick="triggerTestCallNow(${c.id})" class="px-3 py-1.5 bg-emerald-700/80 hover:bg-emerald-600 text-white text-xs font-semibold rounded-xl flex items-center space-x-1.5 border border-emerald-400/40 transition-all cursor-pointer">
-                  <i class="fa-solid fa-phone text-xs"></i>
-                  <span>今すぐ着信テスト</span>
-                </button>
-              `}
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function triggerTestCallNow(id) {
-      const cap = capsules.find(c => c.id === id);
-      if (cap) {
-        cap.status = 'delivered';
-        saveCapsulesToStorage();
-        renderCapsules();
-        triggerIncomingCall(cap);
-      }
-    }
-
-    function playSavedAudio(url, btnElement) {
-      if (!url) return;
-      const icon = btnElement.querySelector('i');
-
-      if (currentPlayingUrl === url) {
-        stopCurrentAudio();
-        if (icon) icon.className = "fa-solid fa-play text-xs";
-        btnElement.classList.remove('playing-glow');
-        return;
-      }
-
-      if (icon) icon.className = "fa-solid fa-square text-xs";
-      btnElement.classList.add('playing-glow');
-
-      playAudioWithEarpieceRouting(url, () => {
-        if (icon) icon.className = "fa-solid fa-play text-xs";
-        btnElement.classList.remove('playing-glow');
-      });
-    }
-
-    function deleteCapsule(id) {
-      capsules = capsules.filter(c => c.id !== id);
-      saveCapsulesToStorage();
-      renderCapsules();
-    }
-
-    function startRingtone() {
-      try {
-        stopRingtone();
-        setNativeAudioMode('SPEAKER');
-        ringtoneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        ringtoneOscillator = ringtoneAudioCtx.createOscillator();
-        const gainNode = ringtoneAudioCtx.createGain();
-
-        ringtoneOscillator.type = 'sine';
-        ringtoneOscillator.frequency.setValueAtTime(440, ringtoneAudioCtx.currentTime);
-        gainNode.gain.setValueAtTime(0.12, ringtoneAudioCtx.currentTime);
-
-        ringtoneOscillator.connect(gainNode);
-        gainNode.connect(ringtoneAudioCtx.destination);
-        ringtoneOscillator.start();
-      } catch(e) {}
-    }
-
-    function stopRingtone() {
-      if (ringtoneOscillator) {
-        try { ringtoneOscillator.stop(); } catch(e){}
-        ringtoneOscillator = null;
-      }
-      if (ringtoneAudioCtx) {
-        try { ringtoneAudioCtx.close(); } catch(e){}
-        ringtoneAudioCtx = null;
-      }
+    function startCapsuleMonitoring() {
+      if (capsuleMonitorInterval) clearInterval(capsuleMonitorInterval);
+      capsuleMonitorInterval = setInterval(() => {
+        const now = Date.now();
+        const due = capsules.find(c => c.status === 'scheduled' && c.targetTimestamp <= now);
+        if (due) {
+          triggerIncomingCall(due);
+        }
+      }, 1000);
     }
 
     function triggerIncomingCall(capsule) {
       activeCallingCapsule = capsule;
-      replyAudioBlob = null;
-      replyAudioUrl = null;
+      capsule.status = 'called';
+      saveCapsulesToStorage();
+      renderCapsules();
 
-      document.getElementById('call-sender-name').innerText = capsule.senderName;
-      document.getElementById('call-status-text').innerText = "過去からの着信...";
-      
-      const callAvatarImg = document.getElementById('call-avatar-img');
-      if (callAvatarImg) {
-        callAvatarImg.src = capsule.senderAvatar || userAvatarData || 'icon.png';
+      const modal = document.getElementById('incoming-call-modal');
+      const nameEl = document.getElementById('incoming-caller-name');
+      const avatarEl = document.getElementById('incoming-avatar');
+      const subtextEl = document.getElementById('incoming-subtext');
+
+      nameEl.innerText = capsule.senderName || "過去の自分";
+      if (capsule.senderAvatar) {
+        avatarEl.src = capsule.senderAvatar;
+      } else {
+        avatarEl.src = "icon.png";
       }
 
-      document.getElementById('accept-call-btn').classList.remove('hidden');
-      document.getElementById('reply-area').classList.add('hidden');
-      document.getElementById('speaker-toggle-container').classList.add('hidden');
-      document.getElementById('call-overlay').classList.remove('hidden');
+      if (capsule.isFromFriend) {
+        subtextEl.innerText = "友達からのタイムカプセル通話";
+      } else {
+        subtextEl.innerText = "過去のあなたからのタイムカプセル通話";
+      }
 
+      modal.classList.remove('hidden');
       startRingtone();
     }
 
-    function acceptCall() {
+    // Synthesized Japanese-style realistic telephone bell
+    function startRingtone() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        ringtoneAudioCtx = new AudioCtx();
+        playRingtoneBeep();
+      } catch (e) {
+        console.warn("Ringtone audio context error:", e);
+      }
+    }
+
+    let ringtoneTimer = null;
+    function playRingtoneBeep() {
+      if (!ringtoneAudioCtx) return;
+      const osc1 = ringtoneAudioCtx.createOscillator();
+      const osc2 = ringtoneAudioCtx.createOscillator();
+      const gain = ringtoneAudioCtx.createGain();
+
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(400, ringtoneAudioCtx.currentTime);
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(450, ringtoneAudioCtx.currentTime);
+
+      gain.gain.setValueAtTime(0.15, ringtoneAudioCtx.currentTime);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ringtoneAudioCtx.destination);
+
+      osc1.start();
+      osc2.start();
+
+      osc1.stop(ringtoneAudioCtx.currentTime + 1.0);
+      osc2.stop(ringtoneAudioCtx.currentTime + 1.0);
+
+      ringtoneTimer = setTimeout(() => {
+        if (ringtoneAudioCtx) playRingtoneBeep();
+      }, 3000);
+    }
+
+    function stopRingtone() {
+      if (ringtoneTimer) clearTimeout(ringtoneTimer);
+      if (ringtoneAudioCtx) {
+        ringtoneAudioCtx.close().catch(() => {});
+        ringtoneAudioCtx = null;
+      }
+    }
+
+    function declineIncomingCall() {
       stopRingtone();
-
-      document.getElementById('accept-call-btn').classList.add('hidden');
-      document.getElementById('reply-area').classList.remove('hidden');
-      document.getElementById('speaker-toggle-container').classList.remove('hidden');
-      document.getElementById('call-status-text').innerText = "通話中: 00:00";
-      callSeconds = 0;
-      clearInterval(callTimerInterval);
-      
-      callTimerInterval = setInterval(() => {
-        callSeconds++;
-        const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
-        const secs = String(callSeconds % 60).padStart(2, '0');
-        document.getElementById('call-status-text').innerText = `通話中: ${mins}:${secs}`;
-      }, 1000);
-
-      if (activeCallingCapsule && activeCallingCapsule.audioUrl) {
-        playAudioWithEarpieceRouting(activeCallingCapsule.audioUrl, () => {
-          document.getElementById('call-status-text').innerText = "通話中 (メッセージ再生完了)";
-        });
-      }
-    }
-
-    async function toggleReplyRecording() {
-      const micBtn = document.getElementById('reply-mic-btn');
-      const micIcon = document.getElementById('reply-mic-icon');
-      const replyStatus = document.getElementById('reply-status');
-      const replyPlayBtn = document.getElementById('reply-play-btn');
-
-      stopCurrentAudio();
-
-      if (!isReplyRecording) {
-        replyStatus.innerText = "マイク起動中...";
-        stopActiveStream();
-
-        try {
-          currentStream = await getAudioStream();
-          replyAudioChunks = [];
-
-          let options = {};
-          if (typeof MediaRecorder !== 'undefined') {
-            if (MediaRecorder.isTypeSupported('audio/webm')) {
-              options = { mimeType: 'audio/webm' };
-            } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-              options = { mimeType: 'audio/mp4' };
-            } else if (MediaRecorder.isTypeSupported('audio/aac')) {
-              options = { mimeType: 'audio/aac' };
-            }
-          }
-
-          replyMediaRecorder = new MediaRecorder(currentStream, options);
-
-          replyMediaRecorder.ondataavailable = event => {
-            if (event.data && event.data.size > 0) replyAudioChunks.push(event.data);
-          };
-
-          replyMediaRecorder.onstop = () => {
-            const mimeType = (replyMediaRecorder && replyMediaRecorder.mimeType) ? replyMediaRecorder.mimeType : 'audio/mp4';
-            replyAudioBlob = new Blob(replyAudioChunks, { type: mimeType });
-            replyAudioUrl = URL.createObjectURL(replyAudioBlob);
-            
-            if (activeCallingCapsule) {
-              activeCallingCapsule.replyAudioUrl = replyAudioUrl;
-              saveCapsulesToStorage();
-              renderCapsules();
-            }
-
-            replyPlayBtn.classList.remove('hidden');
-            replyStatus.innerText = "返答を記録しました！";
-            stopActiveStream();
-          };
-
-          replyMediaRecorder.start(100);
-          isReplyRecording = true;
-          micBtn.className = "w-12 h-12 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md pulse-animation cursor-pointer";
-          micIcon.className = "fa-solid fa-square text-base";
-          replyStatus.innerText = "返答を録音中... タップで停止";
-        } catch (err) {
-          console.error("返答録音エラー:", err);
-          isReplyRecording = false;
-          stopActiveStream();
-          replyStatus.innerText = "マイクの起動に失敗しました";
-        }
-      } else {
-        try {
-          if (replyMediaRecorder && replyMediaRecorder.state !== "inactive") replyMediaRecorder.stop();
-        } catch (e) {}
-        isReplyRecording = false;
-        micBtn.className = "w-12 h-12 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-md cursor-pointer";
-        micIcon.className = "fa-solid fa-microphone text-base";
-      }
-    }
-
-    function playReplyPreview() {
-      const icon = document.getElementById('reply-play-icon');
-      const text = document.getElementById('reply-play-text');
-      if (!replyAudioUrl) return;
-
-      if (currentPlayingUrl === replyAudioUrl) {
-        stopCurrentAudio();
-        icon.className = "fa-solid fa-play text-xs";
-        text.innerText = "返答を確認";
-      } else {
-        icon.className = "fa-solid fa-square text-xs";
-        text.innerText = "再生停止";
-
-        playAudioWithEarpieceRouting(replyAudioUrl, () => {
-          icon.className = "fa-solid fa-play text-xs";
-          text.innerText = "返答を確認";
-        });
-      }
-    }
-
-    function endCall() {
-      stopRingtone();
-      clearInterval(callTimerInterval);
-      stopCurrentAudio();
-      
-      if (isReplyRecording && replyMediaRecorder) {
-        try { replyMediaRecorder.stop(); } catch(e){}
-      }
-      stopActiveStream();
-      setNativeAudioMode('NORMAL');
-
-      document.getElementById('call-overlay').classList.add('hidden');
-
-      // PATTERN B: Trigger Photo Reveal when call ends
-      if (activeCallingCapsule && activeCallingCapsule.photoData) {
-        showMemoryPhotoModal(activeCallingCapsule.photoData, activeCallingCapsule.senderName);
-      }
-
+      document.getElementById('incoming-call-modal').classList.add('hidden');
       activeCallingCapsule = null;
     }
 
-    function showMemoryPhotoModal(photoSrc, senderName) {
-      const modal = document.getElementById('memory-reveal-modal');
-      const img = document.getElementById('reveal-photo-img');
-      const placeholder = document.getElementById('reveal-photo-placeholder');
-      const subtitle = document.getElementById('memory-reveal-subtitle');
+    function acceptIncomingCall() {
+      stopRingtone();
+      document.getElementById('incoming-call-modal').classList.add('hidden');
 
-      subtitle.innerText = `${senderName} から当時の思い出写真が届きました`;
+      const activeModal = document.getElementById('active-call-modal');
+      const activeName = document.getElementById('active-call-name');
+      const activeAvatar = document.getElementById('active-call-avatar');
+      const routingStatus = document.getElementById('active-call-routing-status');
 
-      if (photoSrc) {
-        img.src = photoSrc;
-        img.classList.remove('hidden');
-        placeholder.classList.add('hidden');
-      } else {
-        img.src = "";
-        img.classList.add('hidden');
-        placeholder.classList.remove('hidden');
+      if (activeCallingCapsule) {
+        activeName.innerText = activeCallingCapsule.senderName || "過去の自分";
+        if (activeCallingCapsule.senderAvatar) {
+          activeAvatar.src = activeCallingCapsule.senderAvatar;
+        } else {
+          activeAvatar.src = "icon.png";
+        }
       }
+
+      routingStatus.innerText = isSpeakerMode ? "本体スピーカーモード通話中" : "受話器（耳あて）モード通話中";
+      activeModal.classList.remove('hidden');
+
+      startCallTimer();
+
+      // Play the time capsule voice message
+      if (activeCallingCapsule && activeCallingCapsule.audioUrl) {
+        const audio = new Audio(activeCallingCapsule.audioUrl);
+        currentAudioElement = audio;
+        applySpeakerRoutingToElement(audio, isSpeakerMode);
+        audio.play().catch(e => console.warn("Voice playback error:", e));
+      }
+    }
+
+    function startCallTimer() {
+      callSeconds = 0;
+      const durEl = document.getElementById('active-call-duration');
+      durEl.innerText = "00:00";
+      callTimerInterval = setInterval(() => {
+        callSeconds++;
+        const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+        const s = String(callSeconds % 60).padStart(2, '0');
+        durEl.innerText = `${m}:${s}`;
+      }, 1000);
+    }
+
+    function stopCallTimer() {
+      if (callTimerInterval) clearInterval(callTimerInterval);
+    }
+
+    function endCurrentCall() {
+      stopCallTimer();
+      stopAllPlayingAudio();
+      document.getElementById('active-call-modal').classList.add('hidden');
+
+      // Check if photo is attached (Pattern B: Reveal photo right after ending call)
+      if (activeCallingCapsule && activeCallingCapsule.photoData) {
+        showPhotoRevealModal(activeCallingCapsule);
+      } else {
+        activeCallingCapsule = null;
+      }
+    }
+
+    function showPhotoRevealModal(capsule) {
+      const modal = document.getElementById('photo-reveal-modal');
+      const titleEl = document.getElementById('reveal-sender-title');
+      const imgEl = document.getElementById('reveal-photo-img');
+      const dateEl = document.getElementById('reveal-photo-date');
+
+      titleEl.innerText = `${capsule.senderName || '過去の自分'} からの写真`;
+      imgEl.src = capsule.photoData;
+      dateEl.innerText = `お届け日時: ${capsule.targetTimeText || '本日'}`;
 
       modal.classList.remove('hidden');
     }
 
-    function closeMemoryRevealModal() {
-      document.getElementById('memory-reveal-modal').classList.add('hidden');
+    function closePhotoRevealModal() {
+      document.getElementById('photo-reveal-modal').classList.add('hidden');
+      activeCallingCapsule = null;
     }
 
-    function switchTab(tab) {
-      const screenRecord = document.getElementById('screen-record');
-      const screenHistory = document.getElementById('screen-history');
-      const navRecord = document.getElementById('nav-record');
-      const navHistory = document.getElementById('nav-history');
-
-      if (tab === 'record') {
-        screenRecord.classList.remove('hidden');
-        screenHistory.classList.add('hidden');
-        navRecord.className = 'flex flex-col items-center space-y-1 text-[#A78BFA]';
-        navHistory.className = 'flex flex-col items-center space-y-1 text-slate-400';
-      } else {
-        screenRecord.classList.add('hidden');
-        screenHistory.classList.remove('hidden');
-        navRecord.className = 'flex flex-col items-center space-y-1 text-slate-400';
-        navHistory.className = 'flex flex-col items-center space-y-1 text-[#A78BFA]';
+    function stopAllPlayingAudio() {
+      if (currentAudioElement) {
+        currentAudioElement.pause();
+        currentAudioElement.currentTime = 0;
+        currentAudioElement = null;
       }
+    }
+
+    async function toggleReplyRecording() {
+      const btn = document.getElementById('reply-record-btn');
+      const icon = document.getElementById('reply-record-icon');
+      const label = document.getElementById('reply-record-label');
+
+      if (!isReplyRecording) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          replyAudioChunks = [];
+          replyMediaRecorder = new MediaRecorder(stream);
+          replyMediaRecorder.ondataavailable = e => {
+            if (e.data.size > 0) replyAudioChunks.push(e.data);
+          };
+          replyMediaRecorder.onstop = () => {
+            replyAudioBlob = new Blob(replyAudioChunks, { type: 'audio/webm' });
+            replyAudioUrl = URL.createObjectURL(replyAudioBlob);
+            label.innerText = "返信音声を記録しました ✓";
+            icon.className = "fa-solid fa-check text-emerald-400";
+            btn.className = "w-full py-2.5 px-4 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-xs font-semibold text-emerald-300 flex items-center justify-center space-x-2";
+          };
+          replyMediaRecorder.start();
+          isReplyRecording = true;
+          icon.className = "fa-solid fa-stop text-red-400";
+          label.innerText = "録音中... タップして返信完了";
+          btn.className = "w-full py-2.5 px-4 rounded-xl bg-red-950/80 border border-red-500/50 text-xs font-semibold text-red-300 flex items-center justify-center space-x-2 animate-pulse";
+        } catch(e) {
+          console.error("Reply mic error:", e);
+        }
+      } else {
+        if (replyMediaRecorder && replyMediaRecorder.state !== 'inactive') {
+          replyMediaRecorder.stop();
+        }
+        isReplyRecording = false;
+      }
+    }
+
+    function renderCapsules() {
+      const container = document.getElementById('capsule-list-container');
+      const badge = document.getElementById('capsule-count-badge');
+      if (!container) return;
+
+      badge.innerText = `${capsules.length}件`;
+      container.innerHTML = '';
+
+      if (capsules.length === 0) {
+        container.innerHTML = `
+          <div class="p-8 text-center bg-[#1E293B]/60 rounded-2xl border border-slate-800 space-y-2">
+            <i class="fa-regular fa-folder-open text-3xl text-slate-500"></i>
+            <p class="text-xs text-slate-400">届いた通話や予約中のカプセルはまだありません</p>
+          </div>
+        `;
+        return;
+      }
+
+      capsules.forEach((cap) => {
+        const item = document.createElement('div');
+        item.className = "p-3.5 bg-[#1E293B] rounded-2xl border border-slate-700 flex items-center justify-between space-x-3 shadow-sm";
+
+        const isScheduled = cap.status === 'scheduled';
+        const statusBadge = isScheduled 
+          ? `<span class="text-[10px] bg-purple-950 text-purple-300 border border-purple-500/50 px-2 py-0.5 rounded-full font-bold">予約待機中</span>`
+          : `<span class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-500/50 px-2 py-0.5 rounded-full font-bold">開封済み</span>`;
+
+        const hasPhoto = cap.photoData ? `<i class="fa-solid fa-camera text-purple-400 text-xs" title="写真あり"></i>` : '';
+
+        item.innerHTML = `
+          <div class="flex items-center space-x-3 overflow-hidden">
+            <div class="w-10 h-10 rounded-full overflow-hidden bg-slate-800 border border-purple-400/40 shrink-0 flex items-center justify-center">
+              <img src="${cap.senderAvatar || 'icon.png'}" alt="Avatar" class="w-full h-full object-cover">
+            </div>
+            <div class="overflow-hidden">
+              <div class="flex items-center space-x-1.5">
+                <p class="text-xs font-bold text-white truncate">${cap.senderName || '過去の自分'}</p>
+                ${hasPhoto}
+              </div>
+              <p class="text-[11px] text-slate-400">${cap.targetTimeText}</p>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2 shrink-0">
+            ${statusBadge}
+            ${cap.audioUrl ? `
+              <button type="button" onclick="playSingleHistoryAudio(${cap.id})" class="w-8 h-8 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow text-xs">
+                <i class="fa-solid fa-play"></i>
+              </button>
+            ` : ''}
+            ${cap.photoData ? `
+              <button type="button" onclick="viewHistoryPhoto(${cap.id})" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-600 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-image"></i>
+              </button>
+            ` : ''}
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function playSingleHistoryAudio(id) {
+      const cap = capsules.find(c => c.id === id);
+      if (!cap || !cap.audioUrl) return;
+      stopAllPlayingAudio();
+
+      const audio = new Audio(cap.audioUrl);
+      currentAudioElement = audio;
+      applySpeakerRoutingToElement(audio, isSpeakerMode);
+      audio.play().catch(e => console.warn(e));
+    }
+
+    function viewHistoryPhoto(id) {
+      const cap = capsules.find(c => c.id === id);
+      if (cap && cap.photoData) {
+        showPhotoRevealModal(cap);
+      }
+    }
+
+    function saveCapsulesToStorage() {
+      localStorage.setItem('ourie_saved_capsules', JSON.stringify(capsules));
     }
   </script>
 </body>
