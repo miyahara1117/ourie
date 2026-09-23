@@ -398,6 +398,16 @@
   </div>
 
   <script>
+    // Firebase Production Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDIf4qHuuWIM6CHxrTzYPf1jde7lBubdSQ",
+      authDomain: "ourie-b6249.firebaseapp.com",
+      projectId: "ourie-b6249",
+      storageBucket: "ourie-b6249.firebasestorage.app",
+      messagingSenderId: "989152519117",
+      appId: "1:989152519117:web:8f11165502c3b04e725a84"
+    };
+
     // State management
     let isRecording = false;
     let recordedAudioBlob = null;
@@ -413,7 +423,7 @@
 
     let activeCallingCapsule = null;
     let ringtoneAudioCtx = null;
-    let ringtoneOscillator = null;
+    let ringtoneTimer = null;
 
     let isReplyRecording = false;
     let replyMediaRecorder = null;
@@ -428,17 +438,12 @@
     let isSpeakerMode = false;
 
     let currentAudioElement = null;
-    let activeAudioCtx = null;
-    let activeAudioSource = null;
-    let currentPlayingUrl = null;
-    let currentOnEndedHandler = null;
-
     let capsuleMonitorInterval = null;
     let db = null; // Firestore instance for multi-device sync
 
     window.onload = () => {
       initMyUserId();
-      initFirebaseIfConfigured();
+      initFirebase();
 
       const savedAvatar = localStorage.getItem('ourie_user_avatar');
       const savedName = localStorage.getItem('ourie_user_name');
@@ -491,7 +496,6 @@
 
       const displayEl = document.getElementById('my-user-id-display');
       if (displayEl) {
-        const prevText = displayEl.innerText;
         displayEl.innerText = "コピー完了!";
         setTimeout(() => {
           displayEl.innerText = myUserId;
@@ -571,19 +575,15 @@
       }
     }
 
-    function initFirebaseIfConfigured() {
-      const configStr = localStorage.getItem('ourie_firebase_config');
-      if (configStr) {
-        try {
-          const cfg = JSON.parse(configStr);
-          if (!firebase.apps.length) {
-            firebase.initializeApp(cfg);
-          }
-          db = firebase.firestore();
-          listenForFriendCapsules();
-        } catch(e) {
-          console.warn("Firebase initialization skipped:", e);
+    function initFirebase() {
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
         }
+        db = firebase.firestore();
+        listenForFriendCapsules();
+      } catch(e) {
+        console.warn("Firebase initialization error:", e);
       }
     }
 
@@ -650,13 +650,12 @@
 
       const reader = new FileReader();
       reader.onload = (e) => {
-        // Compress while preserving aspect ratio
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const maxDim = 800; // High resolution preserving ratio
+          const maxDim = 800;
 
           if (width > maxDim || height > maxDim) {
             if (width > height) {
@@ -674,7 +673,6 @@
           ctx.drawImage(img, 0, 0, width, height);
           memoryPhotoData = canvas.toDataURL('image/jpeg', 0.8);
 
-          // Display in UI
           document.getElementById('photo-placeholder-content').classList.add('hidden');
           const previewImg = document.getElementById('photo-preview-img');
           previewImg.src = memoryPhotoData;
@@ -952,7 +950,6 @@
       startRingtone();
     }
 
-    // Synthesized Japanese-style realistic telephone bell
     function startRingtone() {
       try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -963,7 +960,6 @@
       }
     }
 
-    let ringtoneTimer = null;
     function playRingtoneBeep() {
       if (!ringtoneAudioCtx) return;
       const osc1 = ringtoneAudioCtx.createOscillator();
@@ -1029,7 +1025,6 @@
 
       startCallTimer();
 
-      // Play the time capsule voice message
       if (activeCallingCapsule && activeCallingCapsule.audioUrl) {
         const audio = new Audio(activeCallingCapsule.audioUrl);
         currentAudioElement = audio;
@@ -1059,7 +1054,6 @@
       stopAllPlayingAudio();
       document.getElementById('active-call-modal').classList.add('hidden');
 
-      // Check if photo is attached (Pattern B: Reveal photo right after ending call)
       if (activeCallingCapsule && activeCallingCapsule.photoData) {
         showPhotoRevealModal(activeCallingCapsule);
       } else {
