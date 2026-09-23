@@ -54,20 +54,20 @@
   <!-- Header Bar -->
   <header class="shrink-0 h-14 bg-[#111827]/90 border-b border-slate-800/80 px-4 flex items-center justify-between backdrop-blur-md z-10">
     <div class="flex items-center space-x-2.5">
-      <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 p-0.5 shadow-md flex items-center justify-center overflow-hidden">
+      <div class="w-9 h-9 min-w-[2.25rem] rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 p-0.5 shadow-md flex items-center justify-center overflow-hidden shrink-0">
         <img id="header-avatar-img" src="icon.png" alt="Ourie" class="w-full h-full object-cover rounded-full" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
       </div>
-      <div>
-        <h1 class="text-base font-extrabold tracking-wide text-white flex items-center gap-1.5">
+      <div class="overflow-hidden">
+        <h1 class="text-base font-extrabold tracking-wide text-white flex items-center gap-1.5 truncate">
           <span>Ourie</span>
           <span class="text-[10px] px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded font-semibold border border-purple-400/30">TIME CAPSULE</span>
         </h1>
-        <p id="header-user-name" class="text-[11px] text-slate-400">過去の自分</p>
+        <p id="header-user-name" class="text-[11px] text-slate-400 truncate">過去の自分</p>
       </div>
     </div>
 
     <!-- Quick Audio Output Switch -->
-    <button id="speaker-toggle-btn" type="button" onclick="toggleSpeakerMode()" class="px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs font-semibold flex items-center space-x-1.5 text-purple-300 hover:bg-slate-700 transition active:scale-95 shadow">
+    <button id="speaker-toggle-btn" type="button" onclick="toggleSpeakerMode()" class="px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs font-semibold flex items-center space-x-1.5 text-purple-300 hover:bg-slate-700 transition active:scale-95 shadow shrink-0">
       <i id="speaker-icon" class="fa-solid fa-phone text-xs"></i>
       <span id="speaker-status-label">受話器（耳あて）</span>
     </button>
@@ -102,9 +102,9 @@
         </div>
 
         <div class="flex items-center space-x-3 pt-1">
-          <!-- Avatar Uploader -->
+          <!-- Avatar Uploader with Strict Sizing Fix -->
           <div class="relative group cursor-pointer shrink-0" onclick="document.getElementById('avatar-file-input').click()">
-            <div class="w-13 h-13 rounded-full overflow-hidden bg-slate-800 border-2 border-purple-400/60 shadow flex items-center justify-center">
+            <div class="w-14 h-14 min-w-[3.5rem] max-w-[3.5rem] rounded-full overflow-hidden bg-slate-800 border-2 border-purple-400/60 shadow flex items-center justify-center">
               <img id="profile-avatar-preview" src="icon.png" alt="Profile Avatar" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>';">
             </div>
             <div class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
@@ -113,8 +113,8 @@
             <input id="avatar-file-input" type="file" accept="image/*" class="hidden" onchange="handleAvatarUpload(event)">
           </div>
 
-          <div class="flex-1 space-y-1">
-            <label class="text-xs text-slate-300 font-medium block">表示名（着信時に相手の画面に表示）</label>
+          <div class="flex-1 min-w-0 space-y-1">
+            <label class="text-xs text-slate-300 font-medium block truncate">表示名（着信時に相手の画面に表示）</label>
             <input id="profile-name-input" type="text" value="過去の自分" placeholder="例: 1年前の自分、ひろき" 
               oninput="handleNameChange(this.value)"
               class="w-full bg-slate-900/90 text-sm text-white px-3 py-2 rounded-xl border border-slate-700 focus:outline-none focus:ring-1 focus:ring-purple-500">
@@ -251,7 +251,7 @@
         <button id="schedule-btn" type="button" disabled onclick="scheduleCapsule()" 
           class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md">
           <i class="fa-solid fa-phone-arrow-up-right text-base"></i>
-          <span id="schedule-btn-text">タイムカプセル電話を予約する</span>
+          <span id="schedule-btn-text">未来の自分へタイムカプセルを予約する</span>
         </button>
       </div>
 
@@ -435,11 +435,12 @@
     let userName = "過去の自分";
     let myUserId = "";
     let targetMode = "self"; // "self" or "friend"
-    let isSpeakerMode = false;
+    let isSpeakerMode = false; // false = earpiece (default), true = loudspeaker
 
     let currentAudioElement = null;
+    let currentlyPlayingHistoryId = null;
     let capsuleMonitorInterval = null;
-    let db = null; // Firestore instance for multi-device sync
+    let db = null; // Firestore instance
 
     window.onload = () => {
       initMyUserId();
@@ -526,8 +527,17 @@
     function toggleSpeakerMode() {
       isSpeakerMode = !isSpeakerMode;
       updateSpeakerUI();
+
+      // Apply to hardware or browser output immediately
       if (currentAudioElement) {
         applySpeakerRoutingToElement(currentAudioElement, isSpeakerMode);
+      } else {
+        applyHardwareSpeakerMode(isSpeakerMode);
+      }
+
+      const inCallRouting = document.getElementById('active-call-routing-status');
+      if (inCallRouting) {
+        inCallRouting.innerText = isSpeakerMode ? "本体スピーカーモード通話中" : "受話器（耳あて）モード通話中";
       }
     }
 
@@ -548,6 +558,48 @@
         if (banner) {
           banner.innerHTML = "スマホを耳に当てて通話感覚でお聴きいただけます。<br>右上ボタンで本体スピーカーへ即座に切り替え可能です。";
         }
+      }
+    }
+
+    function applyHardwareSpeakerMode(asSpeaker) {
+      // 1. If running inside Cordova/Capacitor with AudioToggle plugin
+      const togglePlugin = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+      if (togglePlugin && typeof togglePlugin.setAudioMode === 'function') {
+        const mode = asSpeaker ? (togglePlugin.SPEAKER || "speaker") : (togglePlugin.EARPIECE || "earpiece");
+        togglePlugin.setAudioMode(mode);
+        return;
+      }
+    }
+
+    function applySpeakerRoutingToElement(audioElement, asSpeaker) {
+      applyHardwareSpeakerMode(asSpeaker);
+
+      if (audioElement && typeof audioElement.setSinkId === 'function') {
+        navigator.mediaDevices.enumerateDevices().then(devices => {
+          const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+          if (audioOutputs.length > 0) {
+            let targetDevice = null;
+            if (asSpeaker) {
+              // Prefer speaker / loudspeaker
+              targetDevice = audioOutputs.find(d => 
+                d.label.toLowerCase().includes('speaker') || 
+                d.label.toLowerCase().includes('スピーカー')
+              ) || audioOutputs[0];
+            } else {
+              // Prefer earpiece / receiver / telephonic
+              targetDevice = audioOutputs.find(d => 
+                d.label.toLowerCase().includes('earpiece') || 
+                d.label.toLowerCase().includes('receiver') || 
+                d.label.toLowerCase().includes('受話') ||
+                d.label.toLowerCase().includes('電話')
+              ) || audioOutputs[1] || audioOutputs[0];
+            }
+
+            if (targetDevice && targetDevice.deviceId) {
+              audioElement.setSinkId(targetDevice.deviceId).catch(e => console.warn("Sink ID error:", e));
+            }
+          }
+        }).catch(e => console.warn("Audio routing error:", e));
       }
     }
 
@@ -788,20 +840,6 @@
       currentAudioElement = audio;
       applySpeakerRoutingToElement(audio, forceSpeaker);
       audio.play().catch(e => console.warn("Playback error:", e));
-    }
-
-    function applySpeakerRoutingToElement(audioElement, asSpeaker) {
-      if (audioElement && typeof audioElement.setSinkId === 'function') {
-        navigator.mediaDevices.enumerateDevices().then(devices => {
-          const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
-          if (audioOutputs.length > 0) {
-            const target = asSpeaker ? audioOutputs[0] : (audioOutputs[1] || audioOutputs[0]);
-            if (target && target.deviceId) {
-              audioElement.setSinkId(target.deviceId).catch(e => console.warn("Sink ID error:", e));
-            }
-          }
-        }).catch(e => console.warn(e));
-      }
     }
 
     function setQuickTestTime(secondsFromNow) {
@@ -1085,6 +1123,8 @@
         currentAudioElement.currentTime = 0;
         currentAudioElement = null;
       }
+      currentlyPlayingHistoryId = null;
+      renderCapsules();
     }
 
     async function toggleReplyRecording() {
@@ -1151,10 +1191,23 @@
           : `<span class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-500/50 px-2 py-0.5 rounded-full font-bold">開封済み</span>`;
 
         const hasPhoto = cap.photoData ? `<i class="fa-solid fa-camera text-purple-400 text-xs" title="写真あり"></i>` : '';
+        const isPlayingThis = currentlyPlayingHistoryId === cap.id;
+
+        const audioBtn = cap.audioUrl ? `
+          <button type="button" onclick="togglePlaySingleHistoryAudio(${cap.id})" class="w-8 h-8 rounded-full ${isPlayingThis ? 'bg-red-600 hover:bg-red-500' : 'bg-purple-600 hover:bg-purple-500'} text-white flex items-center justify-center shadow text-xs transition active:scale-95">
+            <i class="fa-solid ${isPlayingThis ? 'fa-stop' : 'fa-play'}"></i>
+          </button>
+        ` : '';
+
+        const photoBtn = cap.photoData ? `
+          <button type="button" onclick="viewHistoryPhoto(${cap.id})" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-600 flex items-center justify-center text-xs transition active:scale-95">
+            <i class="fa-solid fa-image"></i>
+          </button>
+        ` : '';
 
         item.innerHTML = `
           <div class="flex items-center space-x-3 overflow-hidden">
-            <div class="w-10 h-10 rounded-full overflow-hidden bg-slate-800 border border-purple-400/40 shrink-0 flex items-center justify-center">
+            <div class="w-10 h-10 min-w-[2.5rem] rounded-full overflow-hidden bg-slate-800 border border-purple-400/40 shrink-0 flex items-center justify-center">
               <img src="${cap.senderAvatar || 'icon.png'}" alt="Avatar" class="w-full h-full object-cover">
             </div>
             <div class="overflow-hidden">
@@ -1168,31 +1221,40 @@
 
           <div class="flex items-center space-x-2 shrink-0">
             ${statusBadge}
-            ${cap.audioUrl ? `
-              <button type="button" onclick="playSingleHistoryAudio(${cap.id})" class="w-8 h-8 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow text-xs">
-                <i class="fa-solid fa-play"></i>
-              </button>
-            ` : ''}
-            ${cap.photoData ? `
-              <button type="button" onclick="viewHistoryPhoto(${cap.id})" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-600 flex items-center justify-center text-xs">
-                <i class="fa-solid fa-image"></i>
-              </button>
-            ` : ''}
+            ${audioBtn}
+            ${photoBtn}
           </div>
         `;
         container.appendChild(item);
       });
     }
 
-    function playSingleHistoryAudio(id) {
+    function togglePlaySingleHistoryAudio(id) {
+      if (currentlyPlayingHistoryId === id) {
+        stopAllPlayingAudio();
+        return;
+      }
+
       const cap = capsules.find(c => c.id === id);
       if (!cap || !cap.audioUrl) return;
+
       stopAllPlayingAudio();
 
       const audio = new Audio(cap.audioUrl);
       currentAudioElement = audio;
+      currentlyPlayingHistoryId = id;
       applySpeakerRoutingToElement(audio, isSpeakerMode);
-      audio.play().catch(e => console.warn(e));
+
+      audio.onended = () => {
+        stopAllPlayingAudio();
+      };
+
+      audio.play().catch(e => {
+        console.warn("Audio playback error:", e);
+        stopAllPlayingAudio();
+      });
+
+      renderCapsules();
     }
 
     function viewHistoryPhoto(id) {
