@@ -1042,31 +1042,9 @@
       if (!audioUrl) return;
       stopAllPlayingAudio();
 
-      const useSpeaker = (forceSpeaker === true);
-
-      // 1. ネイティブプラグインでオーディオモードを設定
-      const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
-      if (toggle && typeof toggle.setAudioMode === 'function') {
-        toggle.setAudioMode(useSpeaker ? "speaker" : "earpiece");
-      }
-
-      // 2. Audioエレメントを生成して再生
-      const audio = new Audio();
-      audio.src = audioUrl;
+      const audio = new Audio(audioUrl);
       currentAudioElement = audio;
-
-      audio.onended = () => {
-        if (toggle && typeof toggle.setAudioMode === 'function') {
-          toggle.setAudioMode("speaker");
-        }
-      };
-
-      // 再生開始時に確実にモードを再適用
-      audio.play().then(() => {
-        if (toggle && typeof toggle.setAudioMode === 'function') {
-          toggle.setAudioMode(useSpeaker ? "speaker" : "earpiece");
-        }
-      }).catch(e => console.warn("Playback error:", e));
+      audio.play().catch(e => console.warn("Playback error:", e));
     }
 
     async function scheduleCapsule() {
