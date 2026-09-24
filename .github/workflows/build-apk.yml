@@ -28,12 +28,22 @@ jobs:
       - name: Install Dependencies
         run: |
           npm install --legacy-peer-deps
-          npm install @capacitor/core@^6.0.0 @capacitor/cli@^6.0.0 @capacitor/android@^6.0.0 @capacitor/push-notifications@^6.0.0 --legacy-peer-deps
+          npm install @capacitor/core@^6.0.0 @capacitor/cli@^6.0.0 @capacitor/android@^6.0.0 @capacitor/push-notifications@^6.0.0 cordova-plugin-audiotoggle --legacy-peer-deps
 
       - name: Force Initialize Android Platform
         run: |
           rm -rf android
           npx cap add android
+
+      - name: Inject Call & Fullscreen Permissions into AndroidManifest.xml
+        run: |
+          manifest="android/app/src/main/AndroidManifest.xml"
+          if [ -f "$manifest" ]; then
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" \/>' "$manifest"
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" \/>' "$manifest"
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" \/>' "$manifest"
+            echo "Injected call and fullscreen permissions."
+          fi
 
       - name: Match Package Name with google-services.json
         run: |
@@ -82,9 +92,6 @@ jobs:
             cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
             cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
             cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
-            echo "App icon replaced successfully."
-          else
-            echo "Warning: Icon file not found!"
           fi
 
       - name: Build APK
