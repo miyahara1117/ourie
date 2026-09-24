@@ -1040,31 +1040,33 @@
 
     function playPreviewAudio(forceSpeaker) {
       if (!audioUrl) return;
-      playAudioViaAudioContext(audioUrl, forceSpeaker === true, null);
-    }
+      stopAllPlayingAudio();
 
-    function setQuickTestTime(secondsFromNow) {
-      const target = new Date(Date.now() + secondsFromNow * 1000);
-      const year = target.getFullYear();
-      const month = String(target.getMonth() + 1).padStart(2, '0');
-      const day = String(target.getDate()).padStart(2, '0');
-      const hours = String(target.getHours()).padStart(2, '0');
-      const minutes = String(target.getMinutes()).padStart(2, '0');
-      const val = `${year}-${month}-${day}T${hours}:${minutes}`;
+      const useSpeaker = (forceSpeaker === true);
 
-      const input = document.getElementById('datetime-input');
-      if (input) input.value = val;
-    }
-
-    function enableScheduleButton(enable) {
-      const btn = document.getElementById('schedule-btn');
-      if (enable) {
-        btn.disabled = false;
-        btn.className = "w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-lg active:scale-98 cursor-pointer";
-      } else {
-        btn.disabled = true;
-        btn.className = "w-full py-3.5 bg-slate-800 text-slate-500 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md cursor-not-allowed";
+      // 1. ネイティブプラグインでオーディオモードを設定
+      const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+      if (toggle && typeof toggle.setAudioMode === 'function') {
+        toggle.setAudioMode(useSpeaker ? "speaker" : "earpiece");
       }
+
+      // 2. Audioエレメントを生成して再生
+      const audio = new Audio();
+      audio.src = audioUrl;
+      currentAudioElement = audio;
+
+      audio.onended = () => {
+        if (toggle && typeof toggle.setAudioMode === 'function') {
+          toggle.setAudioMode("speaker");
+        }
+      };
+
+      // 再生開始時に確実にモードを再適用
+      audio.play().then(() => {
+        if (toggle && typeof toggle.setAudioMode === 'function') {
+          toggle.setAudioMode(useSpeaker ? "speaker" : "earpiece");
+        }
+      }).catch(e => console.warn("Playback error:", e));
     }
 
     async function scheduleCapsule() {
@@ -1265,7 +1267,26 @@
       startCallTimer();
 
       if (activeCallingCapsule && activeCallingCapsule.audioUrl) {
-        playAudioViaAudioContext(activeCallingCapsule.audioUrl, isSpeakerMode, null);
+        const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+        if (toggle && typeof toggle.setAudioMode === 'function') {
+          toggle.setAudioMode(isSpeakerMode ? "speaker" : "earpiece");
+        }
+
+        const audio = new Audio();
+        audio.src = activeCallingCapsule.audioUrl;
+        currentAudioElement = audio;
+
+        audio.onended = () => {
+          if (toggle && typeof toggle.setAudioMode === 'function') {
+            toggle.setAudioMode("speaker");
+          }
+        };
+
+        audio.play().then(() => {
+          if (toggle && typeof toggle.setAudioMode === 'function') {
+            toggle.setAudioMode(isSpeakerMode ? "speaker" : "earpiece");
+          }
+        }).catch(e => console.warn("Voice playback error:", e));
       }
     }
 
