@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "989152519117",
+    "project_id": "ourie-b6249",
+    "storage_bucket": "ourie-b6249.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:989152519117:android:814691556e2df3d6725a84",
+        "android_client_info": {
+          "package_name": "com.ourie"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyApIK446lEWrz16wyRNxzsmaUOj6v9hR1A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
