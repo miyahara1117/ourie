@@ -994,44 +994,48 @@
     function playAudioViaAudioContext(targetUrl, useSpeaker, onEndedCallback) {
       stopAllPlayingAudio();
 
-      // ① 音声ストリームを開始する前に即座にハードウェアを切替
       const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+
+      // 1. 再生前にOSへ「通話モード」を強制アサート
       if (toggle && typeof toggle.setAudioMode === 'function') {
-        const mode = useSpeaker ? (toggle.SPEAKER || "speaker") : (toggle.EARPIECE || "earpiece");
-        toggle.setAudioMode(mode);
-      }
-
-      // ② Web Audio APIで通話モードとして物理再生
-      try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        const ctx = new AudioCtx();
-        const audio = new Audio(targetUrl);
-        currentAudioElement = audio;
-
-        // Android OSが再生前にオーディオモードを戻さないよう即時トリガー
-        audio.onplay = () => {
-          if (toggle && typeof toggle.setAudioMode === 'function') {
-            const mode = useSpeaker ? (toggle.SPEAKER || "speaker") : (toggle.EARPIECE || "earpiece");
-            toggle.setAudioMode(mode);
-          }
-        };
-
-        audio.onended = () => {
-          if (toggle && typeof toggle.setAudioMode === 'function') {
+        try {
+          if (useSpeaker) {
             toggle.setAudioMode(toggle.SPEAKER || "speaker");
+          } else {
+            // 受話器モード（EARPIECE）を強力適用
+            toggle.setAudioMode(toggle.EARPIECE || "earpiece");
           }
-          if (typeof onEndedCallback === 'function') onEndedCallback();
-        };
-
-        audio.play().catch(e => {
-          console.warn("Audio Context playback warning:", e);
-        });
-      } catch (e) {
-        // フォールバック
-        const audio = new Audio(targetUrl);
-        currentAudioElement = audio;
-        audio.play();
+        } catch (e) {
+          console.warn("AudioToggle error:", e);
+        }
       }
+
+      // 2. Audioエレメントの生成と通話属性の付与
+      const audio = new Audio(targetUrl);
+      currentAudioElement = audio;
+
+      // HTML5 Audio に通話ストリーム属性を設定（対応ブラウザ用）
+      audio.setAttribute('x-webkit-airplay', 'deny');
+
+      audio.onplay = () => {
+        // 再生が始まった瞬間に再度受話器モードをダメ押しで適用（OSの割り込み防止）
+        if (toggle && typeof toggle.setAudioMode === 'function' && !useSpeaker) {
+          toggle.setAudioMode(toggle.EARPIECE || "earpiece");
+        }
+      };
+
+      audio.onended = () => {
+        // 再生終了時は通常のスピーカーモードへリセット
+        if (toggle && typeof toggle.setAudioMode === 'function') {
+          toggle.setAudioMode(toggle.SPEAKER || "speaker");
+        }
+        if (typeof onEndedCallback === 'function') onEndedCallback();
+      };
+
+      // 3. 再生実行
+      audio.play().catch(e => {
+        console.warn("Playback failed:", e);
+      });
     }
 
     function playPreviewAudio(forceSpeaker) {
