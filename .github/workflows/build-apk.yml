@@ -79,7 +79,10 @@ jobs:
 
       - name: Add and Sync Capacitor Android
         run: |
-          npx cap add android || true
+          npm install @capacitor/android@latest --legacy-peer-deps
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
           npx cap sync android
 
       - name: Check and Replace App Icon
