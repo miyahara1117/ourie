@@ -1,4 +1,8 @@
-name: Build Android APKon:push:branches:- mainworkflow_dispatch:jobs:build:runs-on: ubuntu-lateststeps:
+name: Build Android APK
+on:push:branches:- mainworkflow_dispatch:
+jobs:build:runs- on: ubuntu-latest
+
+steps:
   - name: Checkout repository
     uses: actions/checkout@v4
 
@@ -7,11 +11,11 @@ name: Build Android APKon:push:branches:- mainworkflow_dispatch:jobs:build:runs-
     with:
       node-version: 20
 
-  - name: Setup Java
-    uses: actions/setup-java@v4
-    with:
-      distribution: zulu
-      java-version: 17
+   - name: Setup Java
+     uses: actions/setup-java@v4
+     with:
+       distribution: zulu
+       java-version: 17
 
   - name: Setup Android SDK
     uses: android-actions/setup-android@v3
