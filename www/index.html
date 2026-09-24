@@ -1027,25 +1027,23 @@
       stopAllPlayingAudio();
 
       const useSpeaker = (forceSpeaker === true);
+      const audio = new Audio(audioUrl);
+      currentAudioElement = audio;
 
-      // 1. 再生前に即座に受話器/スピーカーモードを設定
-      if (window.AudioToggle) {
-        window.AudioToggle.setAudioMode(useSpeaker ? window.AudioToggle.SPEAKER : window.AudioToggle.EARPIECE);
-      }
+      // 音声の再生が開始された「直後」に受話器/スピーカー切り替えを実行する
+      audio.onplay = () => {
+        if (window.AudioToggle) {
+          window.AudioToggle.setAudioMode(useSpeaker ? window.AudioToggle.SPEAKER : window.AudioToggle.EARPIECE);
+        }
+      };
 
-      // 2. オーディオモードの切り替え完了を確実にするため100ms待ってから再生
-      setTimeout(() => {
-        const audio = new Audio(audioUrl);
-        currentAudioElement = audio;
+      audio.onended = () => {
+        if (window.AudioToggle) {
+          window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
+        }
+      };
 
-        audio.onended = () => {
-          if (window.AudioToggle) {
-            window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
-          }
-        };
-
-        audio.play().catch(e => console.warn("Playback error:", e));
-      }, 100);
+      audio.play().catch(e => console.warn("Playback error:", e));
     }
 
     async function scheduleCapsule() {
