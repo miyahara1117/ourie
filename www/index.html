@@ -941,25 +941,43 @@
           mediaRecorder = new MediaRecorder(currentStream);
 
           mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) audioChunks.push(e.data);
+            if (e.data && e.data.size > 0) audioChunks.push(e.data);
           };
 
-          mediaRecorder.onstop = async () => {
-            recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            audioUrl = URL.createObjectURL(recordedAudioBlob);
+          mediaRecorder.onstop = () => {
+            try {
+              recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+              audioUrl = URL.createObjectURL(recordedAudioBlob);
 
-            // 録音直後に無条件で即座にボタンを有効化する
-            enableScheduleButton(true);
+              // 1. 理由を問わず確認枠と予約ボタンを即座に表示・有効化
+              const previewBox = document.getElementById('playback-preview-box');
+              if (previewBox) previewBox.classList.remove('hidden');
 
-            // データのベース64化処理
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              audioBase64Data = reader.result;
-            };
-            reader.readAsDataURL(recordedAudioBlob);
+              const durEl = document.getElementById('preview-audio-duration');
+              if (durEl) {
+                const m = String(Math.floor(recSeconds / 60)).padStart(2, '0');
+                const s = String(recSeconds % 60).padStart(2, '0');
+                durEl.innerText = `${m}:${s}`;
+              }
 
-            showPlaybackPreviewBox();
-            document.getElementById('mic-status').innerText = "録音完了！予約できます";
+              enableScheduleButton(true);
+
+              const micStatus = document.getElementById('mic-status');
+              if (micStatus) micStatus.innerText = "録音完了！";
+
+              // 2. バックグラウンドでBase64変換
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                audioBase64Data = reader.result;
+              };
+              reader.readAsDataURL(recordedAudioBlob);
+            } catch (err) {
+              console.error("onstop error:", err);
+              // 万が一エラーが出ても強制的に有効化
+              enableScheduleButton(true);
+              const previewBox = document.getElementById('playback-preview-box');
+              if (previewBox) previewBox.classList.remove('hidden');
+            }
           };
 
           mediaRecorder.start();
@@ -968,15 +986,24 @@
           startRecordingTimer();
         } catch (err) {
           console.error("Mic access error:", err);
-          document.getElementById('mic-status').innerText = "マイクが許可されていません";
+          const micStatus = document.getElementById('mic-status');
+          if (micStatus) micStatus.innerText = "マイクが許可されていません";
         }
       } else {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-          mediaRecorder.stop();
+        try {
+          if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+          }
+        } catch (e) {
+          console.warn("Stop recorder error:", e);
         }
+
         if (currentStream) {
-          currentStream.getTracks().forEach(track => track.stop());
+          try {
+            currentStream.getTracks().forEach(track => track.stop());
+          } catch (e) {}
         }
+
         isRecording = false;
         updateRecordingUI(false);
         stopRecordingTimer();
