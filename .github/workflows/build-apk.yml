@@ -39,11 +39,8 @@ jobs:
         run: |
           manifest="android/app/src/main/AndroidManifest.xml"
           if [ -f "$manifest" ]; then
-            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" \/>' "$manifest"
-            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" \/>' "$manifest"
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" \/>' "$manifest"
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>' "$manifest"
-            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>' "$manifest"
             echo "Injected permissions successfully."
           fi
 
