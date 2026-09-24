@@ -47,46 +47,13 @@ jobs:
             echo "Injected permissions successfully."
           fi
 
-      - name: Match Package Name and Generate MainActivity
+      - name: Match Package Name with google-services.json
         run: |
-          PACKAGE_NAME="com.ourie.timecapsule"
           if [ -f "google-services.json" ]; then
-            EXTRACTED=$(node -e 'console.log(require("./google-services.json").client[0].client_info.android_client_info.package_name)')
-            if [ -n "$EXTRACTED" ]; then
-              PACKAGE_NAME="$EXTRACTED"
-            fi
+            PACKAGE_NAME=$(node -e 'console.log(require("./google-services.json").client[0].client_info.android_client_info.package_name)')
+            echo "Extracted Package Name: $PACKAGE_NAME"
             sed -i "s/applicationId \".*\"/applicationId \"$PACKAGE_NAME\"/g" android/app/build.gradle
           fi
-          echo "Package Name used: $PACKAGE_NAME"
-
-          DIR_PATH="android/app/src/main/java/$(echo $PACKAGE_NAME | tr '.' '/')"
-          mkdir -p "$DIR_PATH"
-          FILE_PATH="$DIR_PATH/MainActivity.java"
-
-          echo "package $PACKAGE_NAME;" > "$FILE_PATH"
-          echo "" >> "$FILE_PATH"
-          echo "import android.os.Bundle;" >> "$FILE_PATH"
-          echo "import android.media.AudioManager;" >> "$FILE_PATH"
-          echo "import android.content.Context;" >> "$FILE_PATH"
-          echo "import com.getcapacitor.BridgeActivity;" >> "$FILE_PATH"
-          echo "" >> "$FILE_PATH"
-          echo "public class MainActivity extends BridgeActivity {" >> "$FILE_PATH"
-          echo "    @Override" >> "$FILE_PATH"
-          echo "    public void onCreate(Bundle savedInstanceState) {" >> "$FILE_PATH"
-          echo "        super.onCreate(savedInstanceState);" >> "$FILE_PATH"
-          echo "        try {" >> "$FILE_PATH"
-          echo "            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);" >> "$FILE_PATH"
-          echo "            if (audioManager != null) {" >> "$FILE_PATH"
-          echo "                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);" >> "$FILE_PATH"
-          echo "                audioManager.setSpeakerphoneOn(false);" >> "$FILE_PATH"
-          echo "            }" >> "$FILE_PATH"
-          echo "        } catch (Exception e) {" >> "$FILE_PATH"
-          echo "            e.printStackTrace();" >> "$FILE_PATH"
-          echo "        }" >> "$FILE_PATH"
-          echo "    }" >> "$FILE_PATH"
-          echo "}" >> "$FILE_PATH"
-
-          echo "MainActivity.java successfully generated."
 
       - name: Copy google-services.json
         run: |
