@@ -5,6 +5,7 @@
 "dependencies": {
 "@capacitor/core": "^6.0.0",
 "@capacitor/android": "^6.0.0",
+"@capacitor/push-notifications": "^6.0.0",
 "cordova-plugin-audiotoggle": "^1.0.3"
 },
 "devDependencies": {
