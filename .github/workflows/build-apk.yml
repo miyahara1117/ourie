@@ -9,8 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
-  steps:
+
+    steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -19,11 +19,11 @@ jobs:
         with:
           node-version: 20
 
-       - name: Setup Java
-         uses: actions/setup-java@v4
-         with:
-           distribution: zulu
-           java-version: 17
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -31,84 +31,89 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Add Android platform
-        run: npx cap add android || true
-
-      - name: Copy google-services
+      - name: Copy google-services.json to Android app directory
         run: |
-          mkdir -p android/app
           if [ -f "google-services.json" ]; then
+            mkdir -p android/app
             cp google-services.json android/app/google-services.json
+            echo "google-services.json copied successfully."
+          else
+            echo "Warning: google-services.json not found in root directory!"
           fi
 
-      - name: Apply Gradle plugins
+      - name: Inject FCM Plugin into capacitor.config.json & package.json
         run: |
           python3 -c '
-          import os
-          path = "android/build.gradle"
-          if os.path.exists(path):
-              with open(path, "r") as f:
-                  content = f.read()
-              if "com.google.gms:google-services" not in content:
-                  content = content.replace("dependencies {", "dependencies {\n        classpath \"com.google.gms:google-services:4.4.2\"")
-                  with open(path, "w") as f:
-                      f.write(content)
-          '
-          python3 -c '
-          import os
-          path = "android/app/build.gradle"
-          if os.path.exists(path):
-              with open(path, "r") as f:
-                  content = f.read()
-              if "com.google.gms.google-services" not in content:
-                  with open(path, "a") as f:
-                      f.write("\napply plugin: \"com.google.gms.google-services\"\n")
+          import json, os
+
+          # Update capacitor.config.json
+          config_path = "capacitor.config.json"
+          if os.path.exists(config_path):
+              with open(config_path, "r") as f:
+                  config = json.load(f)
+              
+              plugins = config.get("plugins", {})
+              plugins["PushNotifications"] = {
+                  "presentationOptions": ["badge", "sound", "alert"]
+              }
+              config["plugins"] = plugins
+              
+              with open(config_path, "w") as f:
+                  json.dump(config, f, indent=2)
+              print("Updated capacitor.config.json with PushNotifications plugin settings.")
+
+          # Update package.json
+          pkg_path = "package.json"
+          if os.path.exists(pkg_path):
+              with open(pkg_path, "r") as f:
+                  pkg = json.load(f)
+              
+              deps = pkg.get("dependencies", {})
+              if "@capacitor/push-notifications" not in deps:
+                  deps["@capacitor/push-notifications"] = "^6.0.0"
+                  pkg["dependencies"] = deps
+                  with open(pkg_path, "w") as f:
+                      json.dump(pkg, f, indent=2)
+                  print("Added @capacitor/push-notifications to package.json.")
           '
 
-      - name: Add Android permissions
+      - name: Install Capacitor Push Notifications plugin
+        run: npm install @capacitor/push-notifications@latest
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Check and Replace App Icon
         run: |
-          python3 -c '
-          import os
-          path = "android/app/src/main/AndroidManifest.xml"
-          perms = """
-              <uses-permission android:name="android.permission.RECORD_AUDIO" />
-              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-              <uses-permission android:name="android.permission.VIBRATE" />
-              <uses-permission android:name="android.permission.WAKE_LOCK" />
-          """
-          if os.path.exists(path):
-              with open(path, "r") as f:
-                  content = f.read()
-              if "POST_NOTIFICATIONS" not in content:
-                  content = content.replace("</manifest>", perms + "\n</manifest>")
-                  with open(path, "w") as f:
-                      f.write(content)
-          '
-          
-      - name: Setup App Icon
-        run: |
-          mkdir -p android/app/src/main/res/mipmap-hdpi
-          mkdir -p android/app/src/main/res/mipmap-mdpi
-          mkdir -p android/app/src/main/res/mipmap-xhdpi
-          mkdir -p android/app/src/main/res/mipmap-xxhdpi
-          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-          rm -rf android/app/src/main/res/mipmap-anydpi-v26/ic_launcher*.xml || true
-          for icon in "www/icon.png" "icon.png" "icon.jpg" "icon_3.jpg"; do
-            if [ -f "$icon" ]; then
-              cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
-              cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
-              cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
-              cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
-              cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
-              cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png || true
-              cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png || true
-              cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
-              cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
-              cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
-              break
-            fi
-          done
+          icon_src=""
+          if [ -f "www/icon.png" ]; then
+            icon_src="www/icon.png"
+          elif [ -f "icon.png" ]; then
+            icon_src="icon.png"
+          elif [ -f "www/icon.jpg" ]; then
+            icon_src="www/icon.jpg"
+          elif [ -f "icon.jpg" ]; then
+            icon_src="icon.jpg"
+          fi
+
+          if [ -n "$icon_src" ]; then
+            echo "Found app icon: $icon_src"
+            icon="$icon_src"
+            
+            cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
+            cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
+            cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
+            cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
+            cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
+            
+            cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png || true
+            cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png || true
+            cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
+            cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
+            cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
+          else
+            echo "Icon file not found, skipping icon replace."
+          fi
 
       - name: Sync Web assets
         run: npx cap sync android
