@@ -73,17 +73,20 @@ jobs:
           fi
 
           if [ -n "$icon_src" ]; then
-            cp "$icon_src" android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
-            cp "$icon_src" android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
-            cp "$icon_src" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
-            cp "$icon_src" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
-            cp "$icon_src" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
+            echo "Found app icon: $icon_src"
             
-            cp "$icon_src" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png || true
-            cp "$icon_src" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png || true
-            cp "$icon_src" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
-            cp "$icon_src" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
-            cp "$icon_src" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
+            # アダプティブアイコン設定XMLを削除してアップ化（強制拡大）を防止
+            rm -rf android/app/src/main/res/mipmap-*/ic_launcher_foreground.xml || true
+            rm -rf android/app/src/main/res/mipmap-*/ic_launcher_background.xml || true
+            rm -rf android/app/src/main/res/drawable*/ic_launcher_*.xml || true
+
+            # 画像ファイルを各解像度に配置
+            for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
+              mkdir -p "android/app/src/main/res/$dir"
+              cp "$icon_src" "android/app/src/main/res/$dir/ic_launcher.png"
+              cp "$icon_src" "android/app/src/main/res/$dir/ic_launcher_round.png"
+            done
+            echo "App icon replaced successfully."
           fi
 
       - name: Build APK
