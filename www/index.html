@@ -951,7 +951,9 @@
             const reader = new FileReader();
             reader.onloadend = () => {
               audioBase64Data = reader.result;
+              // データの準備が完了したら予約ボタンを有効化
               enableScheduleButton(true);
+              document.getElementById('mic-status').innerText = "録音完了！予約可能です";
             };
             reader.readAsDataURL(recordedAudioBlob);
 
@@ -964,12 +966,13 @@
           startRecordingTimer();
         } catch (err) {
           console.error("Mic access error:", err);
-          document.getElementById('mic-status').innerText = "マイクへのアクセスを許可してください";
+          document.getElementById('mic-status').innerText = "マイクが許可されていません（設定を確認してください）";
         }
       } else {
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
           mediaRecorder.stop();
         }
+        // ストリームのトラックを確実に全停止してマイクを解放する
         if (currentStream) {
           currentStream.getTracks().forEach(track => track.stop());
         }
@@ -1027,15 +1030,14 @@
       stopAllPlayingAudio();
 
       const useSpeaker = (forceSpeaker === true);
+
+      // 再生直前にハードウェア（AudioToggle）を強制適用
+      if (window.AudioToggle) {
+        window.AudioToggle.setAudioMode(useSpeaker ? window.AudioToggle.SPEAKER : window.AudioToggle.EARPIECE);
+      }
+
       const audio = new Audio(audioUrl);
       currentAudioElement = audio;
-
-      // 音声の再生が開始された「直後」に受話器/スピーカー切り替えを実行する
-      audio.onplay = () => {
-        if (window.AudioToggle) {
-          window.AudioToggle.setAudioMode(useSpeaker ? window.AudioToggle.SPEAKER : window.AudioToggle.EARPIECE);
-        }
-      };
 
       audio.onended = () => {
         if (window.AudioToggle) {
