@@ -47,46 +47,12 @@ jobs:
             echo "Injected permissions successfully."
           fi
 
-      - name: Native Java Force Earpiece Audio Mode
-        run: |
-          activity=$(find android/app/src/main/java -name "MainActivity.java")
-          if [ -f "$activity" ]; then
-            echo 'package com.ourie.timecapsule;' > "$activity"
-            echo '' >> "$activity"
-            echo 'import android.os.Bundle;' >> "$activity"
-            echo 'import android.media.AudioManager;' >> "$activity"
-            echo 'import android.content.Context;' >> "$activity"
-            echo 'import com.getcapacitor.BridgeActivity;' >> "$activity"
-            echo '' >> "$activity"
-            echo 'public class MainActivity extends BridgeActivity {' >> "$activity"
-            echo '    @Override' >> "$activity"
-            echo '    public void onCreate(Bundle savedInstanceState) {' >> "$activity"
-            echo '        super.onCreate(savedInstanceState);' >> "$activity"
-            echo '        try {' >> "$activity"
-            echo '            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);' >> "$activity"
-            echo '            if (audioManager != null) {' >> "$activity"
-            echo '                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);' >> "$activity"
-            echo '                audioManager.setSpeakerphoneOn(false);' >> "$activity"
-            echo '            }' >> "$activity"
-            echo '        } catch (Exception e) {' >> "$activity"
-            echo '            e.printStackTrace();' >> "$activity"
-            echo '        }' >> "$activity"
-            echo '    }' >> "$activity"
-            echo '}' >> "$activity"
-            echo "Native Java Earpiece MainActivity created."
-          fi
-
       - name: Match Package Name with google-services.json
         run: |
           if [ -f "google-services.json" ]; then
             PACKAGE_NAME=$(node -e 'console.log(require("./google-services.json").client[0].client_info.android_client_info.package_name)')
             echo "Extracted Package Name: $PACKAGE_NAME"
             sed -i "s/applicationId \".*\"/applicationId \"$PACKAGE_NAME\"/g" android/app/build.gradle
-            
-            activity=$(find android/app/src/main/java -name "MainActivity.java")
-            if [ -f "$activity" ]; then
-              sed -i "s/package com.ourie.timecapsule;/package $PACKAGE_NAME;/g" "$activity"
-            fi
           fi
 
       - name: Copy google-services.json
@@ -95,6 +61,19 @@ jobs:
             mkdir -p android/app
             cp google-services.json android/app/google-services.json
             echo "google-services.json copied."
+          fi
+
+      - name: Inject Safe Earpiece Audio Mode into MainActivity
+        run: |
+          activity=$(find android/app/src/main/java -name "MainActivity.java")
+          if [ -f "$activity" ]; then
+            # インポートの追加
+            sed -i '/import com.getcapacitor.BridgeActivity;/a import android.os.Bundle;\nimport android.media.AudioManager;\nimport android.content.Context;' "$activity"
+            
+            # onCreate メソッドの安全な追加
+            sed -i '/public class MainActivity extends BridgeActivity {/a \    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        try {\n            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);\n            if (audioManager != null) {\n                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);\n                audioManager.setSpeakerphoneOn(false);\n            }\n        } catch (Exception e) {}\n    }' "$activity"
+            
+            echo "Safe Earpiece Code Injected."
           fi
 
       - name: Sync Capacitor
