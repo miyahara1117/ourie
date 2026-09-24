@@ -1026,15 +1026,11 @@
       if (!audioUrl) return;
       stopAllPlayingAudio();
 
-      // 受話器モードを強制セット
-      if (window.AudioToggle) {
-        window.AudioToggle.setAudioMode(forceSpeaker ? window.AudioToggle.SPEAKER : window.AudioToggle.EARPIECE);
-      }
+      // 1発目から確実に受話器（耳あて）へ切り替え
+      applyHardwareSpeakerMode(forceSpeaker === true);
 
       const audio = new Audio(audioUrl);
       currentAudioElement = audio;
-      applySpeakerRoutingToElement(audio, forceSpeaker);
-
       audio.play().catch(e => console.warn("Playback error:", e));
     }
 
