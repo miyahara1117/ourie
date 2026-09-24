@@ -1044,18 +1044,22 @@
 
       const useSpeaker = (forceSpeaker === true);
 
-      // プラグインのオブジェクトと定数を網羅的に取得
-      const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
-      
-      if (toggle) {
-        const mode = useSpeaker 
-          ? (toggle.SPEAKER || "speaker") 
-          : (toggle.EARPIECE || "earpiece");
-        
-        if (typeof toggle.setAudioMode === 'function') {
-          toggle.setAudioMode(mode);
-        }
+      // 受話器/スピーカーのハードウェア切り替えを即時実行
+      if (window.AudioToggle && typeof window.AudioToggle.setAudioMode === 'function') {
+        window.AudioToggle.setAudioMode(useSpeaker ? window.AudioToggle.SPEAKER : window.AudioToggle.EARPIECE);
       }
+
+      const audio = new Audio(audioUrl);
+      currentAudioElement = audio;
+
+      audio.onended = () => {
+        if (window.AudioToggle && typeof window.AudioToggle.setAudioMode === 'function') {
+          window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
+        }
+      };
+
+      audio.play().catch(e => console.warn("Playback error:", e));
+    }
 
       const audio = new Audio(audioUrl);
       currentAudioElement = audio;
