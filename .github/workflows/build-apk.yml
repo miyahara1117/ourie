@@ -28,14 +28,14 @@ jobs:
       - name: Install Dependencies
         run: |
           npm install --legacy-peer-deps
-          npm install @capacitor/core@^6.0.0 @capacitor/cli@^6.0.0 @capacitor/android@^6.0.0 @capacitor/push-notifications@^6.0.0 cordova-plugin-audiotoggle @capacitor-community/native-audio --legacy-peer-deps
+          npm install @capacitor/core@^6.0.0 @capacitor/cli@^6.0.0 @capacitor/android@^6.0.0 @capacitor/push-notifications@^6.0.0 cordova-plugin-media cordova-plugin-audiotoggle --legacy-peer-deps
 
       - name: Force Initialize Android Platform
         run: |
           rm -rf android
           npx cap add android
 
-      - name: Inject Permissions into AndroidManifest.xml
+      - name: Inject Call & Fullscreen Permissions into AndroidManifest.xml
         run: |
           manifest="android/app/src/main/AndroidManifest.xml"
           if [ -f "$manifest" ]; then
@@ -43,6 +43,8 @@ jobs:
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" \/>' "$manifest"
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" \/>' "$manifest"
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>' "$manifest"
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" \/>' "$manifest"
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/>' "$manifest"
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>' "$manifest"
             echo "Injected permissions successfully."
           fi
