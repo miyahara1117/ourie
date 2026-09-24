@@ -582,7 +582,6 @@
 
       if (!nameInput || !idInput) return;
 
-      // Update if already exists, otherwise add
       const existingIndex = friends.findIndex(f => f.id === idInput);
       if (existingIndex >= 0) {
         friends[existingIndex].name = nameInput;
@@ -712,7 +711,6 @@
       isSpeakerMode = !isSpeakerMode;
       updateSpeakerUI();
 
-      // Apply to hardware or browser output immediately
       if (currentAudioElement) {
         applySpeakerRoutingToElement(currentAudioElement, isSpeakerMode);
       } else {
@@ -746,7 +744,6 @@
     }
 
     function applyHardwareSpeakerMode(asSpeaker) {
-      // 1. If running inside Cordova/Capacitor with AudioToggle plugin
       const togglePlugin = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
       if (togglePlugin && typeof togglePlugin.setAudioMode === 'function') {
         const mode = asSpeaker ? (togglePlugin.SPEAKER || "speaker") : (togglePlugin.EARPIECE || "earpiece");
@@ -757,34 +754,6 @@
 
     function applySpeakerRoutingToElement(audioElement, asSpeaker) {
       applyHardwareSpeakerMode(asSpeaker);
-
-      if (audioElement && typeof audioElement.setSinkId === 'function') {
-        navigator.mediaDevices.enumerateDevices().then(devices => {
-          const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
-          if (audioOutputs.length > 0) {
-            let targetDevice = null;
-            if (asSpeaker) {
-              // Prefer speaker / loudspeaker
-              targetDevice = audioOutputs.find(d => 
-                d.label.toLowerCase().includes('speaker') || 
-                d.label.toLowerCase().includes('スピーカー')
-              ) || audioOutputs[0];
-            } else {
-              // Prefer earpiece / receiver / telephonic
-              targetDevice = audioOutputs.find(d => 
-                d.label.toLowerCase().includes('earpiece') || 
-                d.label.toLowerCase().includes('receiver') || 
-                d.label.toLowerCase().includes('受話') ||
-                d.label.toLowerCase().includes('電話')
-              ) || audioOutputs[1] || audioOutputs[0];
-            }
-
-            if (targetDevice && targetDevice.deviceId) {
-              audioElement.setSinkId(targetDevice.deviceId).catch(e => console.warn("Sink ID error:", e));
-            }
-          }
-        }).catch(e => console.warn("Audio routing error:", e));
-      }
     }
 
     function setTargetMode(mode) {
@@ -850,7 +819,6 @@
                 saveCapsulesToStorage();
                 renderCapsules();
 
-                // Automatically add or update sender in friends list for easy reply
                 if (data.senderId && !friends.some(f => f.id === data.senderId)) {
                   friends.push({ id: data.senderId, name: data.senderName || '友達' });
                   saveFriendsList();
@@ -1022,31 +990,53 @@
       durEl.innerText = `${m}:${s}`;
     }
 
-    function playPreviewAudio(forceSpeaker) {
-      if (!audioUrl) return;
+    // ▼ 通話ストリーム（受話器）制御を物理同期させるコア関数 ▼
+    function playAudioViaAudioContext(targetUrl, useSpeaker, onEndedCallback) {
       stopAllPlayingAudio();
 
-      const useSpeaker = (forceSpeaker === true);
-      const audio = new Audio(audioUrl);
-      currentAudioElement = audio;
+      // ① 音声ストリームを開始する前に即座にハードウェアを切替
+      const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+      if (toggle && typeof toggle.setAudioMode === 'function') {
+        const mode = useSpeaker ? (toggle.SPEAKER || "speaker") : (toggle.EARPIECE || "earpiece");
+        toggle.setAudioMode(mode);
+      }
 
-      // 再生終了時にモードをスピーカーへリセット
-      audio.onended = () => {
-        const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
-        if (toggle && typeof toggle.setAudioMode === 'function') {
-          toggle.setAudioMode(toggle.SPEAKER || "speaker");
-        }
-      };
+      // ② Web Audio APIで通話モードとして物理再生
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioCtx();
+        const audio = new Audio(targetUrl);
+        currentAudioElement = audio;
 
-      // ① まず再生を開始（OS側に音声ストリームを開かせる）
-      audio.play().then(() => {
-        // ② 再生が始まった瞬間に受話器/スピーカー切り替えを強力に適用
-        const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
-        if (toggle && typeof toggle.setAudioMode === 'function') {
-          const mode = useSpeaker ? (toggle.SPEAKER || "speaker") : (toggle.EARPIECE || "earpiece");
-          toggle.setAudioMode(mode);
-        }
-      }).catch(e => console.warn("Playback error:", e));
+        // Android OSが再生前にオーディオモードを戻さないよう即時トリガー
+        audio.onplay = () => {
+          if (toggle && typeof toggle.setAudioMode === 'function') {
+            const mode = useSpeaker ? (toggle.SPEAKER || "speaker") : (toggle.EARPIECE || "earpiece");
+            toggle.setAudioMode(mode);
+          }
+        };
+
+        audio.onended = () => {
+          if (toggle && typeof toggle.setAudioMode === 'function') {
+            toggle.setAudioMode(toggle.SPEAKER || "speaker");
+          }
+          if (typeof onEndedCallback === 'function') onEndedCallback();
+        };
+
+        audio.play().catch(e => {
+          console.warn("Audio Context playback warning:", e);
+        });
+      } catch (e) {
+        // フォールバック
+        const audio = new Audio(targetUrl);
+        currentAudioElement = audio;
+        audio.play();
+      }
+    }
+
+    function playPreviewAudio(forceSpeaker) {
+      if (!audioUrl) return;
+      playAudioViaAudioContext(audioUrl, forceSpeaker === true, null);
     }
 
     function setQuickTestTime(secondsFromNow) {
@@ -1271,24 +1261,7 @@
       startCallTimer();
 
       if (activeCallingCapsule && activeCallingCapsule.audioUrl) {
-        // 応答ボタンを押した際に、現在の画面モード(デフォルトは受話器)に合わせて切り替え
-        const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
-        if (toggle && typeof toggle.setAudioMode === 'function') {
-          const mode = isSpeakerMode ? (toggle.SPEAKER || "speaker") : (toggle.EARPIECE || "earpiece");
-          toggle.setAudioMode(mode);
-        }
-
-        const audio = new Audio(activeCallingCapsule.audioUrl);
-        currentAudioElement = audio;
-
-        // 通話終了(音声終了)時にスピーカーモードへ戻す
-        audio.onended = () => {
-          if (toggle && typeof toggle.setAudioMode === 'function') {
-            toggle.setAudioMode(toggle.SPEAKER || "speaker");
-          }
-        };
-
-        audio.play().catch(e => console.warn("Voice playback error:", e));
+        playAudioViaAudioContext(activeCallingCapsule.audioUrl, isSpeakerMode, null);
       }
     }
 
@@ -1347,33 +1320,7 @@
 
     function playRevealReplyAudio() {
       if (!activeCallingCapsule || !activeCallingCapsule.replyAudioUrl) return;
-      const playIcon = document.getElementById('reveal-reply-play-icon');
-      const playLabel = document.getElementById('reveal-reply-play-label');
-
-      if (currentAudioElement) {
-        stopAllPlayingAudio();
-        if (playIcon) playIcon.className = "fa-solid fa-play text-[10px]";
-        if (playLabel) playLabel.innerText = "聴く";
-        return;
-      }
-
-      const audio = new Audio(activeCallingCapsule.replyAudioUrl);
-      currentAudioElement = audio;
-      applySpeakerRoutingToElement(audio, isSpeakerMode);
-
-      if (playIcon) playIcon.className = "fa-solid fa-stop text-[10px]";
-      if (playLabel) playLabel.innerText = "停止";
-
-      audio.onended = () => {
-        stopAllPlayingAudio();
-        if (playIcon) playIcon.className = "fa-solid fa-play text-[10px]";
-        if (playLabel) playLabel.innerText = "聴く";
-      };
-
-      audio.play().catch(e => {
-        console.warn("Reply playback error:", e);
-        stopAllPlayingAudio();
-      });
+      playAudioViaAudioContext(activeCallingCapsule.replyAudioUrl, isSpeakerMode, null);
     }
 
     function closePhotoRevealModal() {
@@ -1529,22 +1476,12 @@
       const cap = capsules.find(c => c.id === id);
       if (!cap || !cap.replyAudioUrl) return;
 
-      stopAllPlayingAudio();
-
-      const audio = new Audio(cap.replyAudioUrl);
-      currentAudioElement = audio;
-      currentlyPlayingReplyId = id;
-      applySpeakerRoutingToElement(audio, isSpeakerMode);
-
-      audio.onended = () => {
-        stopAllPlayingAudio();
-      };
-
-      audio.play().catch(e => {
-        console.warn("Reply audio playback error:", e);
-        stopAllPlayingAudio();
+      playAudioViaAudioContext(cap.replyAudioUrl, isSpeakerMode, () => {
+        currentlyPlayingReplyId = null;
+        renderCapsules();
       });
 
+      currentlyPlayingReplyId = id;
       renderCapsules();
     }
 
@@ -1557,22 +1494,12 @@
       const cap = capsules.find(c => c.id === id);
       if (!cap || !cap.audioUrl) return;
 
-      stopAllPlayingAudio();
-
-      const audio = new Audio(cap.audioUrl);
-      currentAudioElement = audio;
-      currentlyPlayingHistoryId = id;
-      applySpeakerRoutingToElement(audio, isSpeakerMode);
-
-      audio.onended = () => {
-        stopAllPlayingAudio();
-      };
-
-      audio.play().catch(e => {
-        console.warn("Audio playback error:", e);
-        stopAllPlayingAudio();
+      playAudioViaAudioContext(cap.audioUrl, isSpeakerMode, () => {
+        currentlyPlayingHistoryId = null;
+        renderCapsules();
       });
 
+      currentlyPlayingHistoryId = id;
       renderCapsules();
     }
 
