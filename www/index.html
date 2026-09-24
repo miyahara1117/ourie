@@ -936,13 +936,12 @@
     async function toggleRecording() {
       if (!isRecording) {
         try {
-          // マイクアクセス取得
           currentStream = await navigator.mediaDevices.getUserMedia({ audio: true });
           audioChunks = [];
           mediaRecorder = new MediaRecorder(currentStream);
 
           mediaRecorder.ondataavailable = (e) => {
-            if (e.data && e.data.size > 0) audioChunks.push(e.data);
+            if (e.data.size > 0) audioChunks.push(e.data);
           };
 
           mediaRecorder.onstop = () => {
@@ -965,19 +964,18 @@
           startRecordingTimer();
         } catch (err) {
           console.error("Mic access error:", err);
-          alert("マイクのアクセス許可が必要です。端末の設定からマイクを許可してください。");
+          document.getElementById('mic-status').innerText = "マイクへのアクセスを許可してください";
         }
       } else {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+        }
+        if (currentStream) {
+          currentStream.getTracks().forEach(track => track.stop());
+        }
         isRecording = false;
         updateRecordingUI(false);
         stopRecordingTimer();
-
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-          try { mediaRecorder.stop(); } catch(e) {}
-        }
-        if (currentStream) {
-          try { currentStream.getTracks().forEach(track => track.stop()); } catch(e) {}
-        }
       }
     }
 
@@ -1024,39 +1022,38 @@
       durEl.innerText = `${m}:${s}`;
     }
 
-   function playPreviewAudio(forceSpeaker) {
+    function playPreviewAudio(forceSpeaker) {
       if (!audioUrl) return;
       stopAllPlayingAudio();
 
-      const useSpeaker = (forceSpeaker === true);
-
-      // 受話器/スピーカーのハードウェア切り替えを即時実行
-      if (window.AudioToggle && typeof window.AudioToggle.setAudioMode === 'function') {
-        window.AudioToggle.setAudioMode(useSpeaker ? window.AudioToggle.SPEAKER : window.AudioToggle.EARPIECE);
-      }
-
       const audio = new Audio(audioUrl);
       currentAudioElement = audio;
-
-      audio.onended = () => {
-        if (window.AudioToggle && typeof window.AudioToggle.setAudioMode === 'function') {
-          window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
-        }
-      };
-
+      applySpeakerRoutingToElement(audio, forceSpeaker);
       audio.play().catch(e => console.warn("Playback error:", e));
     }
 
-      const audio = new Audio(audioUrl);
-      currentAudioElement = audio;
+    function setQuickTestTime(secondsFromNow) {
+      const target = new Date(Date.now() + secondsFromNow * 1000);
+      const year = target.getFullYear();
+      const month = String(target.getMonth() + 1).padStart(2, '0');
+      const day = String(target.getDate()).padStart(2, '0');
+      const hours = String(target.getHours()).padStart(2, '0');
+      const minutes = String(target.getMinutes()).padStart(2, '0');
+      const val = `${year}-${month}-${day}T${hours}:${minutes}`;
 
-      audio.onended = () => {
-        if (toggle && typeof toggle.setAudioMode === 'function') {
-          toggle.setAudioMode(toggle.SPEAKER || "speaker");
-        }
-      };
+      const input = document.getElementById('datetime-input');
+      if (input) input.value = val;
+    }
 
-      audio.play().catch(e => console.warn("Playback error:", e));
+    function enableScheduleButton(enable) {
+      const btn = document.getElementById('schedule-btn');
+      if (enable) {
+        btn.disabled = false;
+        btn.className = "w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-lg active:scale-98 cursor-pointer";
+      } else {
+        btn.disabled = true;
+        btn.className = "w-full py-3.5 bg-slate-800 text-slate-500 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md cursor-not-allowed";
+      }
     }
 
     async function scheduleCapsule() {
@@ -1257,22 +1254,9 @@
       startCallTimer();
 
       if (activeCallingCapsule && activeCallingCapsule.audioUrl) {
-        // ▼ 再生前に受話器（耳あて）モードを強制適用
-        if (window.AudioToggle) {
-          window.AudioToggle.setAudioMode(isSpeakerMode ? window.AudioToggle.SPEAKER : window.AudioToggle.EARPIECE);
-        }
-
         const audio = new Audio(activeCallingCapsule.audioUrl);
         currentAudioElement = audio;
         applySpeakerRoutingToElement(audio, isSpeakerMode);
-
-        // ▼ 音声再生が終了したら標準（スピーカー）へ戻す
-        audio.onended = function() {
-          if (window.AudioToggle) {
-            window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
-          }
-        };
-
         audio.play().catch(e => console.warn("Voice playback error:", e));
       }
     }
@@ -1571,73 +1555,6 @@
     function saveCapsulesToStorage() {
       localStorage.setItem('ourie_saved_capsules', JSON.stringify(capsules));
     }
-// ----------------------------------------------------
-    // ▼ プッシュ通知（FCM）自動トークン取得＆Firestore連携 ▼
-    // ----------------------------------------------------
-    async function initCapacitorPushNotifications() {
-      try {
-        if (!window.Capacitor || !window.Capacitor.isPluginAvailable('PushNotifications')) {
-          console.log('PushNotifications plugin is not available on this platform.');
-          return;
-        }
-
-        const PushNotifications = window.Capacitor.Plugins.PushNotifications;
-
-        let permStatus = await PushNotifications.checkPermissions();
-        if (permStatus.receive === 'prompt') {
-          permStatus = await PushNotifications.requestPermissions();
-        }
-        if (permStatus.receive !== 'granted') {
-          console.warn('Push notification permission denied.');
-          return;
-        }
-
-        await PushNotifications.register();
-
-        // トークン取得時：自分のOurie IDに紐付けてFirestoreへ保存
-        PushNotifications.addListener('registration', async (token) => {
-          console.log('FCM Registration Token:', token.value);
-          if (db && myUserId) {
-            try {
-              await db.collection('users').doc(myUserId).set({
-                fcmToken: token.value,
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-              }, { merge: true });
-              console.log('FCM Token successfully synced for user:', myUserId);
-            } catch (e) {
-              console.error('Error syncing FCM token:', e);
-            }
-          }
-        });
-
-        // 通知をタップした時：即座に対象カプセルの着信画面を起動
-        PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-          const data = notification.notification.data;
-          if (data && data.capsuleId) {
-            openCapsuleById(data.capsuleId);
-          }
-        });
-
-      } catch (err) {
-        console.error('Failed to init Push Notifications:', err);
-      }
-    }
-
-    function openCapsuleById(capsuleId) {
-      const target = capsules.find(c => c.id == capsuleId || c.remoteId == capsuleId);
-      if (target) {
-        triggerIncomingCall(target);
-      }
-    }
-
-    // アプリ起動時にプッシュ通知の初期化を自動実行
-    window.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        initCapacitorPushNotifications();
-      }, 1500);
-    });
-    // ----------------------------------------------------
-    
   </script>
 </body>
 </html>
