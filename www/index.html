@@ -1254,9 +1254,22 @@
       startCallTimer();
 
       if (activeCallingCapsule && activeCallingCapsule.audioUrl) {
+        // ▼ 再生前に受話器（耳あて）モードを強制適用
+        if (window.AudioToggle) {
+          window.AudioToggle.setAudioMode(isSpeakerMode ? window.AudioToggle.SPEAKER : window.AudioToggle.EARPIECE);
+        }
+
         const audio = new Audio(activeCallingCapsule.audioUrl);
         currentAudioElement = audio;
         applySpeakerRoutingToElement(audio, isSpeakerMode);
+
+        // ▼ 音声再生が終了したら標準（スピーカー）へ戻す
+        audio.onended = function() {
+          if (window.AudioToggle) {
+            window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
+          }
+        };
+
         audio.play().catch(e => console.warn("Voice playback error:", e));
       }
     }
