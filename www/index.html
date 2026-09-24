@@ -945,39 +945,32 @@
           };
 
           mediaRecorder.onstop = () => {
-            try {
-              recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-              audioUrl = URL.createObjectURL(recordedAudioBlob);
+            recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            audioUrl = URL.createObjectURL(recordedAudioBlob);
 
-              // 1. 理由を問わず確認枠と予約ボタンを即座に表示・有効化
-              const previewBox = document.getElementById('playback-preview-box');
-              if (previewBox) previewBox.classList.remove('hidden');
-
-              const durEl = document.getElementById('preview-audio-duration');
-              if (durEl) {
-                const m = String(Math.floor(recSeconds / 60)).padStart(2, '0');
-                const s = String(recSeconds % 60).padStart(2, '0');
-                durEl.innerText = `${m}:${s}`;
-              }
-
+            // FileReaderを待たずにBlobから直接Base64化して変数とボタンを即時確定
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              audioBase64Data = reader.result;
               enableScheduleButton(true);
+            };
+            reader.readAsDataURL(recordedAudioBlob);
 
-              const micStatus = document.getElementById('mic-status');
-              if (micStatus) micStatus.innerText = "録音完了！";
+            // 万が一の保険としてボタン有効化を即時実行
+            enableScheduleButton(true);
 
-              // 2. バックグラウンドでBase64変換
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                audioBase64Data = reader.result;
-              };
-              reader.readAsDataURL(recordedAudioBlob);
-            } catch (err) {
-              console.error("onstop error:", err);
-              // 万が一エラーが出ても強制的に有効化
-              enableScheduleButton(true);
-              const previewBox = document.getElementById('playback-preview-box');
-              if (previewBox) previewBox.classList.remove('hidden');
+            const previewBox = document.getElementById('playback-preview-box');
+            if (previewBox) previewBox.classList.remove('hidden');
+
+            const durEl = document.getElementById('preview-audio-duration');
+            if (durEl) {
+              const m = String(Math.floor(recSeconds / 60)).padStart(2, '0');
+              const s = String(recSeconds % 60).padStart(2, '0');
+              durEl.innerText = `${m}:${s}`;
             }
+
+            const micStatus = document.getElementById('mic-status');
+            if (micStatus) micStatus.innerText = "録音完了！";
           };
 
           mediaRecorder.start();
@@ -990,20 +983,12 @@
           if (micStatus) micStatus.innerText = "マイクが許可されていません";
         }
       } else {
-        try {
-          if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-          }
-        } catch (e) {
-          console.warn("Stop recorder error:", e);
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          try { mediaRecorder.stop(); } catch(e) {}
         }
-
         if (currentStream) {
-          try {
-            currentStream.getTracks().forEach(track => track.stop());
-          } catch (e) {}
+          try { currentStream.getTracks().forEach(track => track.stop()); } catch(e) {}
         }
-
         isRecording = false;
         updateRecordingUI(false);
         stopRecordingTimer();
@@ -1059,26 +1044,26 @@
 
       const useSpeaker = (forceSpeaker === true);
 
-      // Capacitor/Cordovaプラグイン経由で受話器/スピーカーを即時強制制御
-      try {
-        const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
-        if (toggle && typeof toggle.setAudioMode === 'function') {
-          toggle.setAudioMode(useSpeaker ? 'speaker' : 'earpiece');
+      // プラグインのオブジェクトと定数を網羅的に取得
+      const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+      
+      if (toggle) {
+        const mode = useSpeaker 
+          ? (toggle.SPEAKER || "speaker") 
+          : (toggle.EARPIECE || "earpiece");
+        
+        if (typeof toggle.setAudioMode === 'function') {
+          toggle.setAudioMode(mode);
         }
-      } catch (e) {
-        console.warn("AudioToggle error:", e);
       }
 
       const audio = new Audio(audioUrl);
       currentAudioElement = audio;
 
       audio.onended = () => {
-        try {
-          const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
-          if (toggle && typeof toggle.setAudioMode === 'function') {
-            toggle.setAudioMode('speaker');
-          }
-        } catch (e) {}
+        if (toggle && typeof toggle.setAudioMode === 'function') {
+          toggle.setAudioMode(toggle.SPEAKER || "speaker");
+        }
       };
 
       audio.play().catch(e => console.warn("Playback error:", e));
