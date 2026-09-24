@@ -26,7 +26,7 @@ jobs:
           java-version: 17
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Copy google-services.json to Android app directory
         run: |
@@ -57,7 +57,6 @@ jobs:
               
               with open(config_path, "w") as f:
                   json.dump(config, f, indent=2)
-              print("Updated capacitor.config.json with PushNotifications plugin settings.")
 
           # Update package.json
           pkg_path = "package.json"
@@ -68,22 +67,28 @@ jobs:
               deps = pkg.get("dependencies", {})
               if "@capacitor/push-notifications" not in deps:
                   deps["@capacitor/push-notifications"] = "^6.0.0"
-                  pkg["dependencies"] = deps
-                  with open(pkg_path, "w") as f:
-                      json.dump(pkg, f, indent=2)
-                  print("Added @capacitor/push-notifications to package.json.")
+              if "@capacitor/android" not in deps:
+                  deps["@capacitor/android"] = "^6.0.0"
+              
+              pkg["dependencies"] = deps
+              with open(pkg_path, "w") as f:
+                  json.dump(pkg, f, indent=2)
           '
 
-      - name: Install Capacitor Push Notifications plugin
-        run: npm install @capacitor/push-notifications@latest --legacy-peer-deps
+      - name: Install Capacitor Android & Push Notifications plugins
+        run: npm install @capacitor/android@^6.0.0 @capacitor/push-notifications@^6.0.0 --legacy-peer-deps
 
-      - name: Add and Sync Capacitor Android
+      - name: Ensure Android Platform Directory Exists
         run: |
-          npm install @capacitor/android@latest --legacy-peer-deps
           if [ ! -d "android" ]; then
+            echo "Android directory not found. Adding Capacitor Android platform..."
             npx cap add android
+          else
+            echo "Android directory exists."
           fi
-          npx cap sync android
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
 
       - name: Check and Replace App Icon
         run: |
@@ -113,12 +118,7 @@ jobs:
             cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
             cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
             cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
-          else
-            echo "Icon file not found, skipping icon replace."
           fi
-
-      - name: Sync Web assets
-        run: npx cap sync android
 
       - name: Build APK
         run: |
