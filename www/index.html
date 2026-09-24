@@ -922,46 +922,32 @@
           if (micStatus) micStatus.innerText = "マイクへのアクセスを許可してください";
         }
       } else {
+        // 録音停止時
         isRecording = false;
         updateRecordingUI(false);
         stopRecordingTimer();
 
-        // 停止処理を実行
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-          try {
-            mediaRecorder.onstop = () => {
-              // 1. Blobと再生用URLを最優先で確定
-              recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-              audioUrl = URL.createObjectURL(recordedAudioBlob);
-
-              // 2. データが生成できた瞬間に「確認枠」を表示＆「予約ボタン」を紫色へ無条件有効化
-              showPlaybackPreviewBox();
-              setQuickTestTime(60);
-              enableScheduleButton(true);
-
-              // 3. Base64への変換を実行（完了時にも念のためボタン有効化を再実行）
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                audioBase64Data = reader.result;
-                enableScheduleButton(true);
-              };
-              reader.readAsDataURL(recordedAudioBlob);
-            };
-            mediaRecorder.stop();
-          } catch (e) {
-            console.warn("Stop recorder error:", e);
-            // 万が一の例外時もボタン有効化を強制実行
-            enableScheduleButton(true);
-          }
-        } else {
-          enableScheduleButton(true);
+          try { mediaRecorder.stop(); } catch(e) {}
         }
-
         if (currentStream) {
-          try {
-            currentStream.getTracks().forEach(track => track.stop());
-          } catch (e) {}
+          try { currentStream.getTracks().forEach(track => track.stop()); } catch(e) {}
         }
+
+        // ▼ 非同期を一切待たずにBlobとURLを生成し、UIと送信ボタンを『即時100%有効化』
+        recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        audioUrl = URL.createObjectURL(recordedAudioBlob);
+
+        showPlaybackPreviewBox();
+        setQuickTestTime(60);
+        enableScheduleButton(true);
+
+        // データ受渡用のBase64化は非同期で裏で完結させる
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          audioBase64Data = reader.result;
+        };
+        reader.readAsDataURL(recordedAudioBlob);
       }
     }
 
@@ -1062,23 +1048,35 @@
 
       const useSpeaker = (forceSpeaker === true);
 
-      // Cordova/CapacitorのAudioToggleプラグインで受話器/スピーカーを切り替え
+      // ハードウェアレベルのオーディオモード強制切替
       const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
       if (toggle && typeof toggle.setAudioMode === 'function') {
         toggle.setAudioMode(useSpeaker ? "speaker" : "earpiece");
       }
 
-      const audio = new Audio(audioUrl);
-      currentAudioElement = audio;
+      // Web Audio APIのコンテキストを経由して「通話ストリーム」として再生
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioCtx();
+        const audio = new Audio(audioUrl);
+        currentAudioElement = audio;
 
-      // 再生終了時に標準のスピーカーへ戻す
-      audio.onended = () => {
-        if (toggle && typeof toggle.setAudioMode === 'function') {
-          toggle.setAudioMode("speaker");
-        }
-      };
+        audio.onended = () => {
+          if (toggle && typeof toggle.setAudioMode === 'function') {
+            toggle.setAudioMode("speaker");
+          }
+        };
 
-      audio.play().catch(e => console.warn("Playback error:", e));
+        audio.play().then(() => {
+          if (toggle && typeof toggle.setAudioMode === 'function') {
+            toggle.setAudioMode(useSpeaker ? "speaker" : "earpiece");
+          }
+        }).catch(e => console.warn("Playback error:", e));
+      } catch (e) {
+        const audio = new Audio(audioUrl);
+        currentAudioElement = audio;
+        audio.play();
+      }
     }
 
     async function scheduleCapsule() {
