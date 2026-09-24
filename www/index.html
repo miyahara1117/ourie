@@ -1555,6 +1555,73 @@
     function saveCapsulesToStorage() {
       localStorage.setItem('ourie_saved_capsules', JSON.stringify(capsules));
     }
+// ----------------------------------------------------
+    // ▼ プッシュ通知（FCM）自動トークン取得＆Firestore連携 ▼
+    // ----------------------------------------------------
+    async function initCapacitorPushNotifications() {
+      try {
+        if (!window.Capacitor || !window.Capacitor.isPluginAvailable('PushNotifications')) {
+          console.log('PushNotifications plugin is not available on this platform.');
+          return;
+        }
+
+        const PushNotifications = window.Capacitor.Plugins.PushNotifications;
+
+        let permStatus = await PushNotifications.checkPermissions();
+        if (permStatus.receive === 'prompt') {
+          permStatus = await PushNotifications.requestPermissions();
+        }
+        if (permStatus.receive !== 'granted') {
+          console.warn('Push notification permission denied.');
+          return;
+        }
+
+        await PushNotifications.register();
+
+        // トークン取得時：自分のOurie IDに紐付けてFirestoreへ保存
+        PushNotifications.addListener('registration', async (token) => {
+          console.log('FCM Registration Token:', token.value);
+          if (db && myUserId) {
+            try {
+              await db.collection('users').doc(myUserId).set({
+                fcmToken: token.value,
+                lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+              console.log('FCM Token successfully synced for user:', myUserId);
+            } catch (e) {
+              console.error('Error syncing FCM token:', e);
+            }
+          }
+        });
+
+        // 通知をタップした時：即座に対象カプセルの着信画面を起動
+        PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+          const data = notification.notification.data;
+          if (data && data.capsuleId) {
+            openCapsuleById(data.capsuleId);
+          }
+        });
+
+      } catch (err) {
+        console.error('Failed to init Push Notifications:', err);
+      }
+    }
+
+    function openCapsuleById(capsuleId) {
+      const target = capsules.find(c => c.id == capsuleId || c.remoteId == capsuleId);
+      if (target) {
+        triggerIncomingCall(target);
+      }
+    }
+
+    // アプリ起動時にプッシュ通知の初期化を自動実行
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        initCapacitorPushNotifications();
+      }, 1500);
+    });
+    // ----------------------------------------------------
+    
   </script>
 </body>
 </html>
