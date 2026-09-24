@@ -25,9 +25,6 @@ jobs:
           distribution: zulu
           java-version: 17
 
-      - name: Install ImageMagick
-        run: sudo apt-get update && sudo apt-get install -y imagemagick
-
       - name: Install Dependencies
         run: |
           npm install --legacy-peer-deps
@@ -46,7 +43,7 @@ jobs:
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" \/>' "$manifest"
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" \/>' "$manifest"
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>' "$manifest"
-            echo "Injected permissions."
+            echo "Injected permissions successfully."
           fi
 
       - name: Match Package Name with google-services.json
@@ -68,33 +65,28 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Replace App Icon with Auto Padding
+      - name: Replace App Icon
         run: |
           icon_src=""
           if [ -f "www/icon.png" ]; then icon_src="www/icon.png";
           elif [ -f "icon.png" ]; then icon_src="icon.png";
-          elif [ -f "www/icon.jpg" ]; then icon_src="www/icon.jpg";
-          elif [ -f "icon.jpg" ]; then icon_src="icon.jpg";
           fi
 
           if [ -n "$icon_src" ]; then
             echo "Found app icon: $icon_src"
-
-            # CapacitorデフォルトXMLを削除
-            rm -rf android/app/src/main/res/mipmap-*/ic_launcher_foreground.xml || true
-            rm -rf android/app/src/main/res/mipmap-*/ic_launcher_background.xml || true
-            rm -rf android/app/src/main/res/drawable*/ic_launcher_*.xml || true
-
-            # 画像を75%に小さくして中央に25%の透明余白を自動付加（アップ化防止）
-            convert "$icon_src" -resize 75% -background none -gravity center -extent 100%x100% padded_icon.png
-
-            # 各サイズにリサイズしてコピー
-            for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
-              mkdir -p "android/app/src/main/res/$dir"
-              cp padded_icon.png "android/app/src/main/res/$dir/ic_launcher.png"
-              cp padded_icon.png "android/app/src/main/res/$dir/ic_launcher_round.png"
-            done
-            echo "Icon padded and replaced successfully."
+            
+            cp "$icon_src" android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
+            cp "$icon_src" android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
+            cp "$icon_src" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
+            cp "$icon_src" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
+            cp "$icon_src" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
+            
+            cp "$icon_src" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png || true
+            cp "$icon_src" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png || true
+            cp "$icon_src" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
+            cp "$icon_src" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
+            cp "$icon_src" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
+            echo "App icon replaced successfully."
           fi
 
       - name: Build APK
