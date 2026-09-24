@@ -59,38 +59,33 @@ jobs:
           fi
           echo "Package Name used: $PACKAGE_NAME"
 
-          # パッケージ名に合わせたディレクトリ作成とクリーンなMainActivity.javaの生成
           DIR_PATH="android/app/src/main/java/$(echo $PACKAGE_NAME | tr '.' '/')"
           mkdir -p "$DIR_PATH"
+          FILE_PATH="$DIR_PATH/MainActivity.java"
 
-          python3 -c "
-pkg = '$PACKAGE_NAME'
-code = f'''package {pkg};
+          echo "package $PACKAGE_NAME;" > "$FILE_PATH"
+          echo "" >> "$FILE_PATH"
+          echo "import android.os.Bundle;" >> "$FILE_PATH"
+          echo "import android.media.AudioManager;" >> "$FILE_PATH"
+          echo "import android.content.Context;" >> "$FILE_PATH"
+          echo "import com.getcapacitor.BridgeActivity;" >> "$FILE_PATH"
+          echo "" >> "$FILE_PATH"
+          echo "public class MainActivity extends BridgeActivity {" >> "$FILE_PATH"
+          echo "    @Override" >> "$FILE_PATH"
+          echo "    public void onCreate(Bundle savedInstanceState) {" >> "$FILE_PATH"
+          echo "        super.onCreate(savedInstanceState);" >> "$FILE_PATH"
+          echo "        try {" >> "$FILE_PATH"
+          echo "            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);" >> "$FILE_PATH"
+          echo "            if (audioManager != null) {" >> "$FILE_PATH"
+          echo "                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);" >> "$FILE_PATH"
+          echo "                audioManager.setSpeakerphoneOn(false);" >> "$FILE_PATH"
+          echo "            }" >> "$FILE_PATH"
+          echo "        } catch (Exception e) {" >> "$FILE_PATH"
+          echo "            e.printStackTrace();" >> "$FILE_PATH"
+          echo "        }" >> "$FILE_PATH"
+          echo "    }" >> "$FILE_PATH"
+          echo "}" >> "$FILE_PATH"
 
-import android.os.Bundle;
-import android.media.AudioManager;
-import android.content.Context;
-import com.getcapacitor.BridgeActivity;
-
-public class MainActivity extends BridgeActivity {{
-    @Override
-    public void onCreate(Bundle savedInstanceState) {{
-        super.onCreate(savedInstanceState);
-        try {{
-            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-            if (audioManager != null) {{
-                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
-                audioManager.setSpeakerphoneOn(false);
-            }}
-        }} catch (Exception e) {{
-            e.printStackTrace();
-        }}
-    }}
-}}
-'''
-with open('$DIR_PATH/MainActivity.java', 'w') as f:
-    f.write(code)
-"
           echo "MainActivity.java successfully generated."
 
       - name: Copy google-services.json
