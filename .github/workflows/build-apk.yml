@@ -54,6 +54,39 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Replace App Icon
+        run: |
+          icon_src=""
+          if [ -f "www/icon.png" ]; then
+            icon_src="www/icon.png"
+          elif [ -f "icon.png" ]; then
+            icon_src="icon.png"
+          elif [ -f "www/icon.jpg" ]; then
+            icon_src="www/icon.jpg"
+          elif [ -f "icon.jpg" ]; then
+            icon_src="icon.jpg"
+          fi
+
+          if [ -n "$icon_src" ]; then
+            echo "Found app icon: $icon_src"
+            icon="$icon_src"
+            
+            cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
+            cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
+            cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
+            cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
+            cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
+            
+            cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png || true
+            cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png || true
+            cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
+            cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
+            cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
+            echo "App icon replaced successfully."
+          else
+            echo "Warning: Icon file not found!"
+          fi
+
       - name: Build APK
         run: |
           cd android
