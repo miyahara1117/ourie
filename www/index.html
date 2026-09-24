@@ -1026,36 +1026,26 @@
       if (!audioUrl) return;
       stopAllPlayingAudio();
 
-      // 1発目から確実に受話器（耳あて）へ切り替え
-      applyHardwareSpeakerMode(forceSpeaker === true);
+      const useSpeaker = (forceSpeaker === true);
 
-      const audio = new Audio(audioUrl);
-      currentAudioElement = audio;
-      audio.play().catch(e => console.warn("Playback error:", e));
-    }
-
-    function setQuickTestTime(secondsFromNow) {
-      const target = new Date(Date.now() + secondsFromNow * 1000);
-      const year = target.getFullYear();
-      const month = String(target.getMonth() + 1).padStart(2, '0');
-      const day = String(target.getDate()).padStart(2, '0');
-      const hours = String(target.getHours()).padStart(2, '0');
-      const minutes = String(target.getMinutes()).padStart(2, '0');
-      const val = `${year}-${month}-${day}T${hours}:${minutes}`;
-
-      const input = document.getElementById('datetime-input');
-      if (input) input.value = val;
-    }
-
-    function enableScheduleButton(enable) {
-      const btn = document.getElementById('schedule-btn');
-      if (enable) {
-        btn.disabled = false;
-        btn.className = "w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-lg active:scale-98 cursor-pointer";
-      } else {
-        btn.disabled = true;
-        btn.className = "w-full py-3.5 bg-slate-800 text-slate-500 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all shadow-md cursor-not-allowed";
+      // 1. 再生前に即座に受話器/スピーカーモードを設定
+      if (window.AudioToggle) {
+        window.AudioToggle.setAudioMode(useSpeaker ? window.AudioToggle.SPEAKER : window.AudioToggle.EARPIECE);
       }
+
+      // 2. オーディオモードの切り替え完了を確実にするため100ms待ってから再生
+      setTimeout(() => {
+        const audio = new Audio(audioUrl);
+        currentAudioElement = audio;
+
+        audio.onended = () => {
+          if (window.AudioToggle) {
+            window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
+          }
+        };
+
+        audio.play().catch(e => console.warn("Playback error:", e));
+      }, 100);
     }
 
     async function scheduleCapsule() {
