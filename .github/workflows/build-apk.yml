@@ -73,8 +73,6 @@ jobs:
           fi
 
           if [ -n "$icon_src" ]; then
-            echo "Found app icon: $icon_src"
-            
             cp "$icon_src" android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
             cp "$icon_src" android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
             cp "$icon_src" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
@@ -86,7 +84,6 @@ jobs:
             cp "$icon_src" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
             cp "$icon_src" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
             cp "$icon_src" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
-            echo "App icon replaced successfully."
           fi
 
       - name: Build APK
