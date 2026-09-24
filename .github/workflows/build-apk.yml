@@ -39,9 +39,24 @@ jobs:
         run: |
           manifest="android/app/src/main/AndroidManifest.xml"
           if [ -f "$manifest" ]; then
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" \/>' "$manifest"
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" \/>' "$manifest"
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" \/>' "$manifest"
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>' "$manifest"
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>' "$manifest"
             echo "Injected permissions successfully."
+          fi
+
+      - name: Native Java Force Earpiece Audio Mode
+        run: |
+          activity="android/app/src/main/java/com/ourie/app/MainActivity.java"
+          if [ ! -f "$activity" ]; then
+            activity=$(find android/app/src/main/java -name "MainActivity.java")
+          fi
+          if [ -f "$activity" ]; then
+            sed -i '/package /a import android.media.AudioManager;\nimport android.content.Context;\nimport android.os.Bundle;' "$activity"
+            sed -i '/public class MainActivity/a \    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);\n        if (audioManager != null) {\n            audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);\n            audioManager.setSpeakerphoneOn(false);\n        }\n    }' "$activity"
+            echo "Native Java Earpiece code injected."
           fi
 
       - name: Match Package Name with google-services.json
