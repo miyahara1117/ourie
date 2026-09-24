@@ -1,118 +1,126 @@
 name: Build Android APK
-on:push:branches:- mainworkflow_dispatch:
-jobs:build:runs- on: ubuntu-latest
 
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
-  - name: Setup Node.js
-    uses: actions/setup-node@v4
-    with:
-      node-version: 20
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-   - name: Setup Java
-     uses: actions/setup-java@v4
-     with:
-       distribution: zulu
-       java-version: 17
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  - name: Setup Android SDK
-    uses: android-actions/setup-android@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-  - name: Install dependencies
-    run: npm install
+       - name: Setup Java
+         uses: actions/setup-java@v4
+         with:
+           distribution: zulu
+           java-version: 17
 
-  - name: Add Android platform
-    run: npx cap add android || true
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-  - name: Copy google-services
-    run: |
-      mkdir -p android/app
-      if [ -f "google-services.json" ]; then
-        cp google-services.json android/app/google-services.json
-      fi
+      - name: Install dependencies
+        run: npm install
 
-  - name: Apply Gradle plugins
-    run: |
-      python3 -c '
-      import os
-      path = "android/build.gradle"
-      if os.path.exists(path):
-          with open(path, "r") as f:
-              content = f.read()
-          if "com.google.gms:google-services" not in content:
-              content = content.replace("dependencies {", "dependencies {\n        classpath \"com.google.gms:google-services:4.4.2\"")
-              with open(path, "w") as f:
-                  f.write(content)
-      '
-      python3 -c '
-      import os
-      path = "android/app/build.gradle"
-      if os.path.exists(path):
-          with open(path, "r") as f:
-              content = f.read()
-          if "com.google.gms.google-services" not in content:
-              with open(path, "a") as f:
-                  f.write("\napply plugin: \"com.google.gms.google-services\"\n")
-      '
+      - name: Add Android platform
+        run: npx cap add android || true
 
-  - name: Add Android permissions
-    run: |
-      python3 -c '
-      import os
-      path = "android/app/src/main/AndroidManifest.xml"
-      perms = """
-          <uses-permission android:name="android.permission.RECORD_AUDIO" />
-          <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-          <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-          <uses-permission android:name="android.permission.VIBRATE" />
-          <uses-permission android:name="android.permission.WAKE_LOCK" />
-      """
-      if os.path.exists(path):
-          with open(path, "r") as f:
-              content = f.read()
-          if "POST_NOTIFICATIONS" not in content:
-              content = content.replace("</manifest>", perms + "\n</manifest>")
-              with open(path, "w") as f:
-                  f.write(content)
-      '
+      - name: Copy google-services
+        run: |
+          mkdir -p android/app
+          if [ -f "google-services.json" ]; then
+            cp google-services.json android/app/google-services.json
+          fi
 
-  - name: Setup App Icon
-    run: |
-      mkdir -p android/app/src/main/res/mipmap-hdpi
-      mkdir -p android/app/src/main/res/mipmap-mdpi
-      mkdir -p android/app/src/main/res/mipmap-xhdpi
-      mkdir -p android/app/src/main/res/mipmap-xxhdpi
-      mkdir -p android/app/src/main/res/mipmap-xxxhdpi
-      rm -rf android/app/src/main/res/mipmap-anydpi-v26/ic_launcher*.xml || true
-      for icon in "www/icon.png" "icon.png" "icon.jpg" "icon_3.jpg"; do
-        if [ -f "$icon" ]; then
-          cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
-          cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
-          cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
-          cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
-          cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
-          cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png || true
-          cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png || true
-          cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
-          cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
-          cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
-          break
-        fi
-      done
+      - name: Apply Gradle plugins
+        run: |
+          python3 -c '
+          import os
+          path = "android/build.gradle"
+          if os.path.exists(path):
+              with open(path, "r") as f:
+                  content = f.read()
+              if "com.google.gms:google-services" not in content:
+                  content = content.replace("dependencies {", "dependencies {\n        classpath \"com.google.gms:google-services:4.4.2\"")
+                  with open(path, "w") as f:
+                      f.write(content)
+          '
+          python3 -c '
+          import os
+          path = "android/app/build.gradle"
+          if os.path.exists(path):
+              with open(path, "r") as f:
+                  content = f.read()
+              if "com.google.gms.google-services" not in content:
+                  with open(path, "a") as f:
+                      f.write("\napply plugin: \"com.google.gms.google-services\"\n")
+          '
 
-  - name: Sync Web assets
-    run: npx cap sync android
+      - name: Add Android permissions
+        run: |
+          python3 -c '
+          import os
+          path = "android/app/src/main/AndroidManifest.xml"
+          perms = """
+              <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              <uses-permission android:name="android.permission.VIBRATE" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
+          """
+          if os.path.exists(path):
+              with open(path, "r") as f:
+                  content = f.read()
+              if "POST_NOTIFICATIONS" not in content:
+                  content = content.replace("</manifest>", perms + "\n</manifest>")
+                  with open(path, "w") as f:
+                      f.write(content)
+          '
+          
+      - name: Setup App Icon
+        run: |
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26/ic_launcher*.xml || true
+          for icon in "www/icon.png" "icon.png" "icon.jpg" "icon_3.jpg"; do
+            if [ -f "$icon" ]; then
+              cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
+              cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
+              cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
+              cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
+              cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
+              cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png || true
+              cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png || true
+              cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
+              cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
+              cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
+              break
+            fi
+          done
 
-  - name: Build APK
-    run: |
-      cd android
-      chmod +x gradlew
-      ./gradlew assembleDebug
+      - name: Sync Web assets
+        run: npx cap sync android
 
-  - name: Upload APK
-    uses: actions/upload-artifact@v4
-    with:
-      name: Ourie-App-APK
-      path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ourie-App-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
