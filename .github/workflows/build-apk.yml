@@ -25,100 +25,26 @@ jobs:
           distribution: zulu
           java-version: 17
 
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
+      - name: Install Dependencies
+        run: |
+          npm install --legacy-peer-deps
+          npm install @capacitor/core@^6.0.0 @capacitor/cli@^6.0.0 @capacitor/android@^6.0.0 @capacitor/push-notifications@^6.0.0 --legacy-peer-deps
 
-      - name: Copy google-services.json to Android app directory
+      - name: Force Initialize Android Platform
+        run: |
+          rm -rf android
+          npx cap add android
+
+      - name: Copy google-services.json
         run: |
           if [ -f "google-services.json" ]; then
             mkdir -p android/app
             cp google-services.json android/app/google-services.json
-            echo "google-services.json copied successfully."
-          else
-            echo "Warning: google-services.json not found in root directory!"
+            echo "google-services.json copied."
           fi
 
-      - name: Inject FCM Plugin into capacitor.config.json & package.json
-        run: |
-          python3 -c '
-          import json, os
-
-          # Update capacitor.config.json
-          config_path = "capacitor.config.json"
-          if os.path.exists(config_path):
-              with open(config_path, "r") as f:
-                  config = json.load(f)
-              
-              plugins = config.get("plugins", {})
-              plugins["PushNotifications"] = {
-                  "presentationOptions": ["badge", "sound", "alert"]
-              }
-              config["plugins"] = plugins
-              
-              with open(config_path, "w") as f:
-                  json.dump(config, f, indent=2)
-
-          # Update package.json
-          pkg_path = "package.json"
-          if os.path.exists(pkg_path):
-              with open(pkg_path, "r") as f:
-                  pkg = json.load(f)
-              
-              deps = pkg.get("dependencies", {})
-              if "@capacitor/push-notifications" not in deps:
-                  deps["@capacitor/push-notifications"] = "^6.0.0"
-              if "@capacitor/android" not in deps:
-                  deps["@capacitor/android"] = "^6.0.0"
-              
-              pkg["dependencies"] = deps
-              with open(pkg_path, "w") as f:
-                  json.dump(pkg, f, indent=2)
-          '
-
-      - name: Install Capacitor Android & Push Notifications plugins
-        run: npm install @capacitor/android@^6.0.0 @capacitor/push-notifications@^6.0.0 --legacy-peer-deps
-
-      - name: Ensure Android Platform Directory Exists
-        run: |
-          if [ ! -d "android" ]; then
-            echo "Android directory not found. Adding Capacitor Android platform..."
-            npx cap add android
-          else
-            echo "Android directory exists."
-          fi
-
-      - name: Sync Capacitor Android
+      - name: Sync Capacitor
         run: npx cap sync android
-
-      - name: Check and Replace App Icon
-        run: |
-          icon_src=""
-          if [ -f "www/icon.png" ]; then
-            icon_src="www/icon.png"
-          elif [ -f "icon.png" ]; then
-            icon_src="icon.png"
-          elif [ -f "www/icon.jpg" ]; then
-            icon_src="www/icon.jpg"
-          elif [ -f "icon.jpg" ]; then
-            icon_src="icon.jpg"
-          fi
-
-          if [ -n "$icon_src" ]; then
-            echo "Found app icon: $icon_src"
-            icon="$icon_src"
-            
-            cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
-            cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
-            cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
-            cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
-            cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
-            
-            cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png || true
-            cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png || true
-            cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
-            cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
-            cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
-          fi
 
       - name: Build APK
         run: |
