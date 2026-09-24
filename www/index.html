@@ -909,12 +909,16 @@
           mediaRecorder = new MediaRecorder(currentStream);
 
           mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) audioChunks.push(e.data);
+            if (e.data && e.data.size > 0) audioChunks.push(e.data);
           };
 
           mediaRecorder.onstop = () => {
             recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
             audioUrl = URL.createObjectURL(recordedAudioBlob);
+
+            // 即座にボタンを強制有効化
+            enableScheduleButton(true);
+            showPlaybackPreviewBox();
 
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -922,8 +926,6 @@
               enableScheduleButton(true);
             };
             reader.readAsDataURL(recordedAudioBlob);
-
-            showPlaybackPreviewBox();
           };
 
           mediaRecorder.start();
@@ -935,15 +937,16 @@
           document.getElementById('mic-status').innerText = "マイクへのアクセスを許可してください";
         }
       } else {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-          mediaRecorder.stop();
-        }
-        if (currentStream) {
-          currentStream.getTracks().forEach(track => track.stop());
-        }
         isRecording = false;
         updateRecordingUI(false);
         stopRecordingTimer();
+
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          try { mediaRecorder.stop(); } catch(e) {}
+        }
+        if (currentStream) {
+          try { currentStream.getTracks().forEach(track => track.stop()); } catch(e) {}
+        }
       }
     }
 
@@ -1042,8 +1045,28 @@
       if (!audioUrl) return;
       stopAllPlayingAudio();
 
+      const useSpeaker = (forceSpeaker === true);
+
+      // プラグインでOSのオーディオ出力切り替え
+      try {
+        const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+        if (toggle && typeof toggle.setAudioMode === 'function') {
+          toggle.setAudioMode(useSpeaker ? "speaker" : "earpiece");
+        }
+      } catch (e) {}
+
       const audio = new Audio(audioUrl);
       currentAudioElement = audio;
+
+      audio.onended = () => {
+        try {
+          const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+          if (toggle && typeof toggle.setAudioMode === 'function') {
+            toggle.setAudioMode("speaker");
+          }
+        } catch (e) {}
+      };
+
       audio.play().catch(e => console.warn("Playback error:", e));
     }
 
