@@ -65,28 +65,32 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Replace App Icon
+      - name: Replace App Icon Forced
         run: |
-          icon_src=""
-          if [ -f "www/icon.png" ]; then icon_src="www/icon.png";
-          elif [ -f "icon.png" ]; then icon_src="icon.png";
+          # icon.png のパスを確実に特定
+          ICON_PATH=""
+          if [ -f "www/icon.png" ]; then ICON_PATH="www/icon.png";
+          elif [ -f "icon.png" ]; then ICON_PATH="icon.png";
           fi
 
-          if [ -n "$icon_src" ]; then
-            echo "Found app icon: $icon_src"
-            
-            # アダプティブアイコン設定XMLを削除してアップ化（強制拡大）を防止
-            rm -rf android/app/src/main/res/mipmap-*/ic_launcher_foreground.xml || true
-            rm -rf android/app/src/main/res/mipmap-*/ic_launcher_background.xml || true
-            rm -rf android/app/src/main/res/drawable*/ic_launcher_*.xml || true
+          if [ -n "$ICON_PATH" ]; then
+            echo "Icon found at: $ICON_PATH"
 
-            # 画像ファイルを各解像度に配置
+            # 既存のアダプティブアイコン（Capacitorデフォルトの青アイコンXML等）を完全削除
+            rm -rf android/app/src/main/res/mipmap-*/ic_launcher*.xml || true
+            rm -rf android/app/src/main/res/drawable*/ic_launcher*.xml || true
+
+            # 全てのmipmapフォルダーへ画像を強制上書き配置
             for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
               mkdir -p "android/app/src/main/res/$dir"
-              cp "$icon_src" "android/app/src/main/res/$dir/ic_launcher.png"
-              cp "$icon_src" "android/app/src/main/res/$dir/ic_launcher_round.png"
+              cp "$ICON_PATH" "android/app/src/main/res/$dir/ic_launcher.png"
+              cp "$ICON_PATH" "android/app/src/main/res/$dir/ic_launcher_round.png"
+              cp "$ICON_PATH" "android/app/src/main/res/$dir/ic_launcher_foreground.png"
             done
-            echo "App icon replaced successfully."
+            echo "Icons replaced successfully!"
+          else
+            echo "Error: icon.png missing!"
+            exit 1
           fi
 
       - name: Build APK
