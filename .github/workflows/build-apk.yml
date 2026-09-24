@@ -75,7 +75,7 @@ jobs:
           '
 
       - name: Install Capacitor Push Notifications plugin
-        run: npm install @capacitor/push-notifications@latest
+        run: npm install @capacitor/push-notifications@latest --legacy-peer-deps
 
       - name: Sync Capacitor Android
         run: npx cap sync android
