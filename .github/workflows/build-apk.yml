@@ -28,14 +28,14 @@ jobs:
       - name: Install Dependencies
         run: |
           npm install --legacy-peer-deps
-          npm install @capacitor/core@^6.0.0 @capacitor/cli@^6.0.0 @capacitor/android@^6.0.0 @capacitor/push-notifications@^6.0.0 cordova-plugin-audiotoggle --legacy-peer-deps
+          npm install @capacitor/core@^6.0.0 @capacitor/cli@^6.0.0 @capacitor/android@^6.0.0 @capacitor/push-notifications@^6.0.0 cordova-plugin-audiotoggle @capacitor-community/native-audio --legacy-peer-deps
 
       - name: Force Initialize Android Platform
         run: |
           rm -rf android
           npx cap add android
 
-      - name: Inject Call & Fullscreen Permissions into AndroidManifest.xml
+      - name: Inject Permissions into AndroidManifest.xml
         run: |
           manifest="android/app/src/main/AndroidManifest.xml"
           if [ -f "$manifest" ]; then
