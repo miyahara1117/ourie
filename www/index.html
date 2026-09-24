@@ -1026,9 +1026,26 @@
       if (!audioUrl) return;
       stopAllPlayingAudio();
 
+      // 受話器(耳あて)か本体スピーカーかを判定
+      const useSpeaker = (forceSpeaker === true);
+
+      // Cordova/CapacitorのAudioToggleプラグインでOSのオーディオモードを切替
+      const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+      if (toggle && typeof toggle.setAudioMode === 'function') {
+        const mode = useSpeaker ? (toggle.SPEAKER || "speaker") : (toggle.EARPIECE || "earpiece");
+        toggle.setAudioMode(mode);
+      }
+
       const audio = new Audio(audioUrl);
       currentAudioElement = audio;
-      applySpeakerRoutingToElement(audio, forceSpeaker);
+
+      // 再生終了時に標準のスピーカーモードへ戻す
+      audio.onended = () => {
+        if (toggle && typeof toggle.setAudioMode === 'function') {
+          toggle.setAudioMode(toggle.SPEAKER || "speaker");
+        }
+      };
+
       audio.play().catch(e => console.warn("Playback error:", e));
     }
 
@@ -1254,9 +1271,23 @@
       startCallTimer();
 
       if (activeCallingCapsule && activeCallingCapsule.audioUrl) {
+        // 応答ボタンを押した際に、現在の画面モード(デフォルトは受話器)に合わせて切り替え
+        const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+        if (toggle && typeof toggle.setAudioMode === 'function') {
+          const mode = isSpeakerMode ? (toggle.SPEAKER || "speaker") : (toggle.EARPIECE || "earpiece");
+          toggle.setAudioMode(mode);
+        }
+
         const audio = new Audio(activeCallingCapsule.audioUrl);
         currentAudioElement = audio;
-        applySpeakerRoutingToElement(audio, isSpeakerMode);
+
+        // 通話終了(音声終了)時にスピーカーモードへ戻す
+        audio.onended = () => {
+          if (toggle && typeof toggle.setAudioMode === 'function') {
+            toggle.setAudioMode(toggle.SPEAKER || "speaker");
+          }
+        };
+
         audio.play().catch(e => console.warn("Voice playback error:", e));
       }
     }
