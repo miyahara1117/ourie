@@ -1026,27 +1026,27 @@
       if (!audioUrl) return;
       stopAllPlayingAudio();
 
-      // 受話器(耳あて)か本体スピーカーかを判定
       const useSpeaker = (forceSpeaker === true);
-
-      // Cordova/CapacitorのAudioToggleプラグインでOSのオーディオモードを切替
-      const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
-      if (toggle && typeof toggle.setAudioMode === 'function') {
-        const mode = useSpeaker ? (toggle.SPEAKER || "speaker") : (toggle.EARPIECE || "earpiece");
-        toggle.setAudioMode(mode);
-      }
-
       const audio = new Audio(audioUrl);
       currentAudioElement = audio;
 
-      // 再生終了時に標準のスピーカーモードへ戻す
+      // 再生終了時にモードをスピーカーへリセット
       audio.onended = () => {
+        const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
         if (toggle && typeof toggle.setAudioMode === 'function') {
           toggle.setAudioMode(toggle.SPEAKER || "speaker");
         }
       };
 
-      audio.play().catch(e => console.warn("Playback error:", e));
+      // ① まず再生を開始（OS側に音声ストリームを開かせる）
+      audio.play().then(() => {
+        // ② 再生が始まった瞬間に受話器/スピーカー切り替えを強力に適用
+        const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+        if (toggle && typeof toggle.setAudioMode === 'function') {
+          const mode = useSpeaker ? (toggle.SPEAKER || "speaker") : (toggle.EARPIECE || "earpiece");
+          toggle.setAudioMode(mode);
+        }
+      }).catch(e => console.warn("Playback error:", e));
     }
 
     function setQuickTestTime(secondsFromNow) {
