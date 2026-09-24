@@ -37,33 +37,11 @@ jobs:
 
       - name: Match Package Name with google-services.json
         run: |
-          python3 -c '
-          import json, os, re
-
-          # google-services.json から package_name を自動取得
-          gs_path = "google-services.json"
-          package_name = "com.ourie.timecapsule" # デフォルト
-          
-          if os.path.exists(gs_path):
-              with open(gs_path, "r") as f:
-                  gs_data = json.load(f)
-                  try:
-                      package_name = gs_data["client"][0]["client_info"]["android_client_info"]["package_name"]
-                      print(f"Detected package_name from google-services.json: {package_name}")
-                  except Exception as e:
-                      print("Could not extract package_name, using default.")
-
-          # build.gradle の appId を自動書き換え
-          gradle_path = "android/app/build.gradle"
-          if os.path.exists(gradle_path):
-              with open(gradle_path, "r") as f:
-                  content = f.read()
-              
-              updated_content = re.sub(r"applicationId\s+[\"'].*?[\"']", f"applicationId \"{package_name}\"", content)
-              with open(gradle_path, "w") as f:
-                  f.write(updated_content)
-              print("Updated android/app/build.gradle with correct applicationId.")
-          '
+          if [ -f "google-services.json" ]; then
+            PACKAGE_NAME=$(node -e 'console.log(require("./google-services.json").client[0].client_info.android_client_info.package_name)')
+            echo "Extracted Package Name: $PACKAGE_NAME"
+            sed -i "s/applicationId \".*\"/applicationId \"$PACKAGE_NAME\"/g" android/app/build.gradle
+          fi
 
       - name: Copy google-services.json
         run: |
