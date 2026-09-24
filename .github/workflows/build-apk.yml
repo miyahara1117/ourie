@@ -68,31 +68,32 @@ jobs:
       - name: Replace App Icon
         run: |
           icon_src=""
-          if [ -f "www/icon.png" ]; then
-            icon_src="www/icon.png"
-          elif [ -f "icon.png" ]; then
-            icon_src="icon.png"
-          elif [ -f "www/icon.jpg" ]; then
-            icon_src="www/icon.jpg"
-          elif [ -f "icon.jpg" ]; then
-            icon_src="icon.jpg"
+          if [ -f "www/icon.png" ]; then icon_src="www/icon.png";
+          elif [ -f "icon.png" ]; then icon_src="icon.png";
+          elif [ -f "www/icon.jpg" ]; then icon_src="www/icon.jpg";
+          elif [ -f "icon.jpg" ]; then icon_src="icon.jpg";
           fi
 
           if [ -n "$icon_src" ]; then
             echo "Found app icon: $icon_src"
-            icon="$icon_src"
             
-            cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
-            cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
-            cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
-            cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
-            cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
-            
-            cp "$icon" android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png || true
-            cp "$icon" android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png || true
-            cp "$icon" android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png || true
-            cp "$icon" android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png || true
-            cp "$icon" android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png || true
+            # デフォルトのアダプティブアイコンXML（Capacitor標準ロゴ）を削除して画像を優先させる
+            rm -rf android/app/src/main/res/mipmap-*/ic_launcher_foreground.xml || true
+            rm -rf android/app/src/main/res/mipmap-*/ic_launcher_background.xml || true
+            rm -rf android/app/src/main/res/drawable/ic_launcher_background.xml || true
+            rm -rf android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml || true
+
+            # アイコン画像を各解像度へコピー
+            for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
+              mkdir -p "android/app/src/main/res/$dir"
+              cp "$icon_src" "android/app/src/main/res/$dir/ic_launcher.png"
+              cp "$icon_src" "android/app/src/main/res/$dir/ic_launcher_round.png"
+              cp "$icon_src" "android/app/src/main/res/$dir/ic_launcher_foreground.png"
+            done
+            echo "App icon completely replaced."
+          else
+            echo "Error: Icon file not found in root or www directory!"
+            exit 1
           fi
 
       - name: Build APK
