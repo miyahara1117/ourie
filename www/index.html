@@ -922,25 +922,24 @@
           if (micStatus) micStatus.innerText = "マイクへのアクセスを許可してください";
         }
       } else {
-        // 1. 録音停止フラグの更新
         isRecording = false;
         updateRecordingUI(false);
         stopRecordingTimer();
 
-        // 2. 録音ストリームの停止
+        // 停止処理を実行
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
           try {
             mediaRecorder.onstop = () => {
-              // ▼ 音声BlobとURLを確実に生成
+              // 1. Blobと再生用URLを最優先で確定
               recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
               audioUrl = URL.createObjectURL(recordedAudioBlob);
 
-              // ▼ 音声URLが完成した瞬間にUIを確実に表示＆有効化
+              // 2. データが生成できた瞬間に「確認枠」を表示＆「予約ボタン」を紫色へ無条件有効化
               showPlaybackPreviewBox();
               setQuickTestTime(60);
               enableScheduleButton(true);
 
-              // ▼ 裏でBase64化
+              // 3. Base64への変換を実行（完了時にも念のためボタン有効化を再実行）
               const reader = new FileReader();
               reader.onloadend = () => {
                 audioBase64Data = reader.result;
@@ -951,7 +950,11 @@
             mediaRecorder.stop();
           } catch (e) {
             console.warn("Stop recorder error:", e);
+            // 万が一の例外時もボタン有効化を強制実行
+            enableScheduleButton(true);
           }
+        } else {
+          enableScheduleButton(true);
         }
 
         if (currentStream) {
