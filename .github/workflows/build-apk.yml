@@ -43,6 +43,7 @@ jobs:
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" \/>' "$manifest"
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" \/>' "$manifest"
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>' "$manifest"
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" \/>' "$manifest"
             echo "Injected permissions successfully."
           fi
 
@@ -67,30 +68,21 @@ jobs:
 
       - name: Replace App Icon Forced
         run: |
-          # icon.png のパスを確実に特定
           ICON_PATH=""
           if [ -f "www/icon.png" ]; then ICON_PATH="www/icon.png";
           elif [ -f "icon.png" ]; then ICON_PATH="icon.png";
           fi
 
           if [ -n "$ICON_PATH" ]; then
-            echo "Icon found at: $ICON_PATH"
-
-            # 既存のアダプティブアイコン（Capacitorデフォルトの青アイコンXML等）を完全削除
             rm -rf android/app/src/main/res/mipmap-*/ic_launcher*.xml || true
             rm -rf android/app/src/main/res/drawable*/ic_launcher*.xml || true
 
-            # 全てのmipmapフォルダーへ画像を強制上書き配置
             for dir in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
               mkdir -p "android/app/src/main/res/$dir"
               cp "$ICON_PATH" "android/app/src/main/res/$dir/ic_launcher.png"
               cp "$ICON_PATH" "android/app/src/main/res/$dir/ic_launcher_round.png"
               cp "$ICON_PATH" "android/app/src/main/res/$dir/ic_launcher_foreground.png"
             done
-            echo "Icons replaced successfully!"
-          else
-            echo "Error: icon.png missing!"
-            exit 1
           fi
 
       - name: Build APK
