@@ -1059,24 +1059,20 @@
 
       const useSpeaker = (forceSpeaker === true);
 
-      // プラグインでOSのオーディオ出力切り替え
-      try {
-        const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
-        if (toggle && typeof toggle.setAudioMode === 'function') {
-          toggle.setAudioMode(useSpeaker ? "speaker" : "earpiece");
-        }
-      } catch (e) {}
+      // Cordova/CapacitorのAudioToggleプラグインで受話器/スピーカーを切り替え
+      const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+      if (toggle && typeof toggle.setAudioMode === 'function') {
+        toggle.setAudioMode(useSpeaker ? "speaker" : "earpiece");
+      }
 
       const audio = new Audio(audioUrl);
       currentAudioElement = audio;
 
+      // 再生終了時に標準のスピーカーへ戻す
       audio.onended = () => {
-        try {
-          const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
-          if (toggle && typeof toggle.setAudioMode === 'function') {
-            toggle.setAudioMode("speaker");
-          }
-        } catch (e) {}
+        if (toggle && typeof toggle.setAudioMode === 'function') {
+          toggle.setAudioMode("speaker");
+        }
       };
 
       audio.play().catch(e => console.warn("Playback error:", e));
