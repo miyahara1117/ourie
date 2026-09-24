@@ -1022,13 +1022,27 @@
       durEl.innerText = `${m}:${s}`;
     }
 
-    function playPreviewAudio(forceSpeaker) {
+   function playPreviewAudio(forceSpeaker) {
       if (!audioUrl) return;
       stopAllPlayingAudio();
 
+      // ▼ 強制指定がない場合は、ユーザーの現在の選択（デフォルトは受話器）を適用
+      const useSpeaker = (forceSpeaker !== undefined) ? forceSpeaker : isSpeakerMode;
+
+      if (window.AudioToggle) {
+        window.AudioToggle.setAudioMode(useSpeaker ? window.AudioToggle.SPEAKER : window.AudioToggle.EARPIECE);
+      }
+
       const audio = new Audio(audioUrl);
       currentAudioElement = audio;
-      applySpeakerRoutingToElement(audio, forceSpeaker);
+      applySpeakerRoutingToElement(audio, useSpeaker);
+
+      audio.onended = () => {
+        if (window.AudioToggle) {
+          window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
+        }
+      };
+
       audio.play().catch(e => console.warn("Playback error:", e));
     }
 
