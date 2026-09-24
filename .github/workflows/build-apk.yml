@@ -51,30 +51,28 @@ jobs:
         run: |
           activity=$(find android/app/src/main/java -name "MainActivity.java")
           if [ -f "$activity" ]; then
-            cat << 'EOF' > "$activity"
-package com.ourie.timecapsule;
-
-import android.os.Bundle;
-import android.media.AudioManager;
-import android.content.Context;
-import com.getcapacitor.BridgeActivity;
-
-public class MainActivity extends BridgeActivity {
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        try {
-            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-            if (audioManager != null) {
-                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
-                audioManager.setSpeakerphoneOn(false);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-}
-EOF
+            echo 'package com.ourie.timecapsule;' > "$activity"
+            echo '' >> "$activity"
+            echo 'import android.os.Bundle;' >> "$activity"
+            echo 'import android.media.AudioManager;' >> "$activity"
+            echo 'import android.content.Context;' >> "$activity"
+            echo 'import com.getcapacitor.BridgeActivity;' >> "$activity"
+            echo '' >> "$activity"
+            echo 'public class MainActivity extends BridgeActivity {' >> "$activity"
+            echo '    @Override' >> "$activity"
+            echo '    public void onCreate(Bundle savedInstanceState) {' >> "$activity"
+            echo '        super.onCreate(savedInstanceState);' >> "$activity"
+            echo '        try {' >> "$activity"
+            echo '            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);' >> "$activity"
+            echo '            if (audioManager != null) {' >> "$activity"
+            echo '                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);' >> "$activity"
+            echo '                audioManager.setSpeakerphoneOn(false);' >> "$activity"
+            echo '            }' >> "$activity"
+            echo '        } catch (Exception e) {' >> "$activity"
+            echo '            e.printStackTrace();' >> "$activity"
+            echo '        }' >> "$activity"
+            echo '    }' >> "$activity"
+            echo '}' >> "$activity"
             echo "Native Java Earpiece MainActivity created."
           fi
 
@@ -85,7 +83,6 @@ EOF
             echo "Extracted Package Name: $PACKAGE_NAME"
             sed -i "s/applicationId \".*\"/applicationId \"$PACKAGE_NAME\"/g" android/app/build.gradle
             
-            # MainActivity.java の package 名も自動的に正しく置換
             activity=$(find android/app/src/main/java -name "MainActivity.java")
             if [ -f "$activity" ]; then
               sed -i "s/package com.ourie.timecapsule;/package $PACKAGE_NAME;/g" "$activity"
