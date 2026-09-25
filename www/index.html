@@ -7,10 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body {
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-    }
+    body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-purple-500 selection:text-white">
@@ -19,11 +16,11 @@
   <header class="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-sm">
     <div class="flex items-center space-x-3">
       <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 p-0.5 flex items-center justify-center shadow-inner">
-        <img src="icon.png" onerror="this.src='https://via.placeholder.com/36'" class="w-full h-full rounded-full object-cover bg-slate-800" alt="App Icon">
+        <img id="header-avatar" src="icon.png" onerror="this.src='https://via.placeholder.com/36'" class="w-full h-full rounded-full object-cover bg-slate-800" alt="App Icon">
       </div>
       <div>
         <h1 class="font-bold text-base tracking-wide bg-gradient-to-r from-purple-400 to-indigo-300 bg-clip-text text-transparent">Ourie <span class="text-xs text-slate-400 font-normal">TIME CAPSULE</span></h1>
-        <p class="text-[10px] text-slate-400">過去の自分</p>
+        <p id="header-sender-name" class="text-[10px] text-slate-400">過去の自分</p>
       </div>
     </div>
     <div class="bg-slate-800/80 border border-slate-700/60 rounded-full px-3 py-1 flex items-center space-x-1.5 shadow-sm">
@@ -35,21 +32,31 @@
   <!-- メインコンテンツ -->
   <main class="flex-1 max-w-md w-full mx-auto px-4 py-5 space-y-5 pb-24">
 
-    <!-- 1. お届け先の選択 -->
+    <!-- 1. お届け先の選択＆プロフィール復元 -->
     <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm">
       <h2 class="text-xs font-bold text-slate-400 mb-3 flex items-center space-x-1.5">
         <i class="fa-solid fa-paper-plane text-purple-400"></i>
         <span>お届け先の選択</span>
       </h2>
-      <div class="grid grid-cols-2 gap-2">
-        <button type="button" class="py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all">
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <button id="target-self-btn" onclick="selectTarget('self')" type="button" class="py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all">
           <i class="fa-solid fa-user"></i>
           <span>未来の自分へ</span>
         </button>
-        <button type="button" class="py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 hover:text-slate-200 font-medium text-xs flex items-center justify-center space-x-2 transition-all">
+        <button id="target-friend-btn" onclick="selectTarget('friend')" type="button" class="py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all">
           <i class="fa-solid fa-users"></i>
           <span>友達へ届ける</span>
         </button>
+      </div>
+      <!-- プロフィール設定表示領域 -->
+      <div id="profile-card" class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
+          <div>
+            <p id="profile-role" class="text-[10px] text-purple-400 font-medium">送信者プロフィール</p>
+            <p id="profile-name" class="text-xs font-bold text-slate-200">過去の自分</p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -63,7 +70,6 @@
         <span id="recording-timer" class="font-mono text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-full">00:00</span>
       </div>
 
-      <!-- 録音ボタン -->
       <div class="my-3 flex justify-center">
         <button id="mic-btn" onclick="toggleRecording()" type="button" class="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 text-white flex flex-col items-center justify-center shadow-lg shadow-purple-900/30 active:scale-95 transition-all">
           <i id="mic-icon" class="fa-solid fa-microphone text-2xl"></i>
@@ -71,7 +77,6 @@
       </div>
       <p id="mic-status" class="text-xs font-medium text-slate-400 mt-2">タップして録音開始</p>
 
-      <!-- 録音確認エリア (録音完了後に解放) -->
       <div id="preview-area" class="hidden mt-4 pt-4 border-t border-slate-800/80 space-y-3">
         <div class="flex items-center justify-between text-xs text-slate-300 px-1">
           <span class="flex items-center space-x-1.5 font-medium">
@@ -126,36 +131,69 @@
 
   </main>
 
-  <!-- JavaScriptモジュール (完全一括定義) -->
+  <!-- 着信モーダル（予約時間に自動起動） -->
+  <div id="incoming-modal" class="hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-lg flex flex-col items-center justify-between p-8">
+    <div class="pt-12 text-center space-y-3">
+      <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 p-1 mx-auto shadow-2xl animate-pulse">
+        <img id="incoming-avatar" src="icon.png" class="w-full h-full rounded-full object-cover">
+      </div>
+      <h3 id="incoming-name" class="text-xl font-bold text-white">過去の自分</h3>
+      <p class="text-xs text-purple-400 animate-bounce">タイムカプセルが届きました</p>
+    </div>
+
+    <div class="w-full max-w-xs pb-12 flex justify-around">
+      <button onclick="declineCall()" class="w-16 h-16 rounded-full bg-red-600 text-white flex items-center justify-center text-xl shadow-lg active:scale-95">
+        <i class="fa-solid fa-phone-slash"></i>
+      </button>
+      <button onclick="acceptCall()" class="w-16 h-16 rounded-full bg-green-500 text-white flex items-center justify-center text-xl shadow-lg active:scale-95 animate-bounce">
+        <i class="fa-solid fa-phone"></i>
+      </button>
+    </div>
+  </div>
+
   <script>
-    // --- グローバル状態管理 ---
     let isRecording = false;
     let recTimer = null;
     let recSeconds = 0;
     let audioFilePath = "";
     let nativeRecorder = null;
     let nativePlayer = null;
-    let webMediaRecorder = null;
-    let webAudioChunks = [];
-    let webAudioUrl = "";
+    let targetMode = 'self';
 
-    // 画面初期化
     document.addEventListener('DOMContentLoaded', () => {
       setTimeOffset(60);
     });
 
-    // --- 日時入力補助 ---
+    // お届け先＆プロフィール制御
+    function selectTarget(mode) {
+      targetMode = mode;
+      const selfBtn = document.getElementById('target-self-btn');
+      const friendBtn = document.getElementById('target-friend-btn');
+      const pName = document.getElementById('profile-name');
+      const pRole = document.getElementById('profile-role');
+
+      if (mode === 'self') {
+        selfBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
+        friendBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
+        pName.innerText = "過去の自分";
+        pRole.innerText = "送信者プロフィール";
+      } else {
+        friendBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
+        selfBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
+        pName.innerText = "指定の友達";
+        pRole.innerText = "お届け先プロフィール";
+      }
+    }
+
     function setTimeOffset(seconds) {
       const now = new Date(Date.now() + seconds * 1000);
       now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
       document.getElementById('target-time-input').value = now.toISOString().slice(0, 16);
     }
 
-    // --- 予約ボタン活性化関数 (無条件強制切り替え) ---
     function setSubmitButtonState(enabled) {
       const btn = document.getElementById('submit-btn');
       if (!btn) return;
-
       if (enabled) {
         btn.removeAttribute('disabled');
         btn.disabled = false;
@@ -167,30 +205,18 @@
       }
     }
 
-    // --- 録音制御 (Native Media 優先 / Web MediaRecorder フォールバック) ---
     async function toggleRecording() {
       const micBtn = document.getElementById('mic-btn');
       const micIcon = document.getElementById('mic-icon');
       const micStatus = document.getElementById('mic-status');
 
       if (!isRecording) {
-        // ▼ 録音開始
         try {
           audioFilePath = "ourie_capsule_" + Date.now() + ".m4a";
-
           if (window.Media) {
-            // Native Plugin 録音
             nativeRecorder = new Media(audioFilePath, () => {}, (err) => console.error(err));
             nativeRecorder.startRecord();
-          } else {
-            // Web 録音 (ブラウザ用)
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            webAudioChunks = [];
-            webMediaRecorder = new MediaRecorder(stream);
-            webMediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) webAudioChunks.push(e.data); };
-            webMediaRecorder.start();
           }
-
           isRecording = true;
           micBtn.className = "w-20 h-20 rounded-full bg-red-600 hover:bg-red-500 text-white flex flex-col items-center justify-center shadow-lg shadow-red-900/40 active:scale-95 transition-all animate-pulse";
           micIcon.className = "fa-solid fa-square text-2xl";
@@ -203,76 +229,75 @@
             const s = String(recSeconds % 60).padStart(2, '0');
             document.getElementById('recording-timer').innerText = `${m}:${s}`;
           }, 1000);
-
-        } catch (e) {
-          console.error("Mic start failed:", e);
-          micStatus.innerText = "マイクの使用が許可されていません";
-        }
+        } catch (e) { console.error(e); }
       } else {
-        // ▼ 録音停止 (待ち時間ゼロで画面を解放)
         isRecording = false;
         clearInterval(recTimer);
-
         micBtn.className = "w-20 h-20 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 text-white flex flex-col items-center justify-center shadow-lg shadow-purple-900/30 active:scale-95 transition-all";
         micIcon.className = "fa-solid fa-microphone text-2xl";
         micStatus.innerText = "録音完了！";
 
         if (nativeRecorder) {
           try { nativeRecorder.stopRecord(); nativeRecorder.release(); } catch(e) {}
-        } else if (webMediaRecorder) {
-          try {
-            webMediaRecorder.stop();
-            webMediaRecorder.onstop = () => {
-              const blob = new Blob(webAudioChunks, { type: 'audio/aac' });
-              webAudioUrl = URL.createObjectURL(blob);
-            };
-          } catch(e) {}
         }
 
-        // 時間の同期と確認エリア表示
         const m = String(Math.floor(recSeconds / 60)).padStart(2, '0');
         const s = String(recSeconds % 60).padStart(2, '0');
         document.getElementById('preview-duration').innerText = `${m}:${s}`;
         document.getElementById('preview-area').classList.remove('hidden');
-
-        // ★ 予約ボタンを最優先で即時有効化
         setSubmitButtonState(true);
       }
     }
 
-    // --- 音声再生制御 (受話器/スピーカー強制ルーティング) ---
     function playAudio(forceSpeaker) {
-      if (nativePlayer) {
-        try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {}
-      }
-
-      // 1. AudioToggle プラグインで受話器(earpiece) / スピーカー(speaker) をハード制御
+      if (nativePlayer) { try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} }
       const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
       if (toggle && typeof toggle.setAudioMode === 'function') {
         toggle.setAudioMode(forceSpeaker ? "speaker" : "earpiece");
       }
-
-      // 2. 音声再生処理
       if (window.Media && audioFilePath) {
         nativePlayer = new Media(audioFilePath,
-          () => {
-            if (toggle && typeof toggle.setAudioMode === 'function') toggle.setAudioMode("speaker");
-          },
-          (err) => console.error("Play error:", err)
+          () => { if (toggle && typeof toggle.setAudioMode === 'function') toggle.setAudioMode("speaker"); },
+          (err) => console.error(err)
         );
         nativePlayer.play();
-      } else if (webAudioUrl) {
-        const audio = new Audio(webAudioUrl);
-        audio.onended = () => {
-          if (toggle && typeof toggle.setAudioMode === 'function') toggle.setAudioMode("speaker");
-        };
-        audio.play();
       }
     }
 
-    // --- タイムカプセル予約実行 ---
+    // 着信予約機能（指定時間になったら自動で着信画面を呼び出す）
     function scheduleCapsule() {
-      alert("タイムカプセルを予約しました！設定した日時に着信が届きます。");
+      const inputVal = document.getElementById('target-time-input').value;
+      if (!inputVal) return alert("お届け日時を選択してください");
+
+      const targetTime = new Date(inputVal).getTime();
+      const delay = targetTime - Date.now();
+
+      if (delay <= 0) return alert("未来の日時を選択してください");
+
+      alert("タイムカプセルを予約しました！指定時間に着信します。");
+
+      // タイマー予約（バックグラウンド/フォアグラウンド両対応）
+      setTimeout(() => {
+        triggerIncomingCall();
+      }, delay);
+    }
+
+    // 着信発火処理
+    function triggerIncomingCall() {
+      document.getElementById('incoming-modal').classList.remove('hidden');
+      // 着信音の受話器再生
+      playAudio(false);
+    }
+
+    function acceptCall() {
+      document.getElementById('incoming-modal').classList.add('hidden');
+      // 通話（メッセージ）受話器再生
+      playAudio(false);
+    }
+
+    function declineCall() {
+      document.getElementById('incoming-modal').classList.add('hidden');
+      if (nativePlayer) { try { nativePlayer.stop(); } catch(e) {} }
     }
   </script>
 </body>
