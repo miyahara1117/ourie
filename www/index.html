@@ -515,25 +515,72 @@
       document.getElementById('image-preview-container').classList.add('hidden');
     }
 
-    // 通話受話（カプセル開封）時：音声再生 ＋ 添付画像があれば表示
+    // 通話受話（カプセル開封）時：まずは音声のみ再生
     function acceptCall() {
-      // 着信ボタン等の非表示（通話中画面への切り替え風）
-      if (attachedImageBase64) {
-        document.getElementById('incoming-attached-image').src = attachedImageBase64;
-        document.getElementById('incoming-attached-image-container').classList.remove('hidden');
-      } else {
-        document.getElementById('incoming-attached-image-container').classList.add('hidden');
-      }
+      const imageContainer = document.getElementById('incoming-attached-image-container');
+      if (imageContainer) imageContainer.classList.add('hidden'); // まだ写真は表示しない
 
-      // 受話器での音声再生
-      playAudio(false);
+      // 受話器での音声再生を開始（再生終了時に写真を自動表示）
+      playAudio(false, true);
     }
 
     // 通話終了・着信拒否時
     function declineCall() {
       document.getElementById('incoming-modal').classList.add('hidden');
-      document.getElementById('incoming-attached-image-container').classList.add('hidden');
+      const imageContainer = document.getElementById('incoming-attached-image-container');
+      if (imageContainer) imageContainer.classList.add('hidden');
       if (nativePlayer) { try { nativePlayer.stop(); } catch(e) {} }
+    }
+
+    // 音声再生処理（onEndedShowImage パラメータ）
+    function playAudio(forceSpeaker, onEndedShowImage = false) {
+      if (nativePlayer) { 
+        try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} 
+      }
+      
+      const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
+      if (toggle && typeof toggle.setAudioMode === 'function') {
+        toggle.setAudioMode(forceSpeaker ? "speaker" : "earpiece");
+      }
+
+      if (window.Media && audioFilePath) {
+        nativePlayer = new Media(
+          audioFilePath,
+          () => {
+            if (toggle && typeof toggle.setAudioMode === 'function') toggle.setAudioMode("speaker");
+            if (onEndedShowImage) {
+              showAttachedImageAfterAudio();
+            }
+          },
+          (err) => console.error(err),
+          (status) => {
+            if (status === 4 && onEndedShowImage) {
+              showAttachedImageAfterAudio();
+            }
+          }
+        );
+        nativePlayer.play();
+      } else {
+        // テスト環境用フォールバック（3秒後に写真表示）
+        if (onEndedShowImage) {
+          setTimeout(() => {
+            showAttachedImageAfterAudio();
+          }, 3000);
+        }
+      }
+    }
+
+    // 音声終了後に添付写真をふわっと表示する処理
+    function showAttachedImageAfterAudio() {
+      if (attachedImageBase64) {
+        const img = document.getElementById('incoming-attached-image');
+        const container = document.getElementById('incoming-attached-image-container');
+        if (img && container) {
+          img.src = attachedImageBase64;
+          container.classList.remove('hidden');
+          container.className = "mt-4 rounded-2xl overflow-hidden border border-purple-500/40 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center transition-all duration-700 opacity-100 scale-100";
+        }
+      }
     }
   </script>
 </body>
