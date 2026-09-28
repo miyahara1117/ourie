@@ -206,27 +206,40 @@
 
   </main>
 
-  <!-- 着信モーダル（画像添付対応） -->
+  <!-- 着信モーダル（通話中画面・タイマー対応） -->
   <div id="incoming-modal" class="hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-lg flex flex-col items-center justify-between p-6 overflow-y-auto">
     <div class="pt-8 text-center space-y-3 w-full max-w-sm">
-      <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 p-1 mx-auto shadow-2xl animate-pulse">
+      <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 p-1 mx-auto shadow-2xl">
         <img id="incoming-avatar" src="icon.png" class="w-full h-full rounded-full object-cover">
       </div>
       <h3 id="incoming-name" class="text-xl font-bold text-white">過去の自分</h3>
-      <p class="text-xs text-purple-400 animate-bounce">タイムカプセルが届きました</p>
+      
+      <!-- 着信中テキスト -->
+      <p id="incoming-status-text" class="text-xs text-purple-400 animate-bounce">タイムカプセルが届きました</p>
+      
+      <!-- 通話中経過タイマー（応答後に表示） -->
+      <p id="call-timer-text" class="hidden font-mono text-sm font-semibold text-green-400">00:00</p>
 
-      <!-- 開封後に表示される添付画像メッセージ -->
+      <!-- 音声完了後に表示される添付写真 -->
       <div id="incoming-attached-image-container" class="hidden mt-4 rounded-2xl overflow-hidden border border-purple-500/40 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center">
         <img id="incoming-attached-image" src="" class="max-h-64 w-full object-contain">
       </div>
     </div>
 
-    <div class="w-full max-w-xs py-8 flex justify-around">
-      <button onclick="declineCall()" class="w-16 h-16 rounded-full bg-red-600 text-white flex items-center justify-center text-xl shadow-lg active:scale-95">
+    <!-- 着信応答前のボタンエリア -->
+    <div id="incoming-actions" class="w-full max-w-xs py-8 flex justify-around">
+      <button onclick="declineCall()" class="w-16 h-16 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-xl shadow-lg active:scale-95">
         <i class="fa-solid fa-phone-slash"></i>
       </button>
-      <button onclick="acceptCall()" class="w-16 h-16 rounded-full bg-green-500 text-white flex items-center justify-center text-xl shadow-lg active:scale-95 animate-bounce">
+      <button onclick="acceptCall()" class="w-16 h-16 rounded-full bg-green-500 hover:bg-green-400 text-white flex items-center justify-center text-xl shadow-lg active:scale-95 animate-bounce">
         <i class="fa-solid fa-phone"></i>
+      </button>
+    </div>
+
+    <!-- 応答後（通話中）の切断ボタンのみのエリア -->
+    <div id="in-call-actions" class="hidden w-full max-w-xs py-8 flex justify-center">
+      <button onclick="declineCall()" class="w-16 h-16 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-xl shadow-lg active:scale-95">
+        <i class="fa-solid fa-phone-slash"></i>
       </button>
     </div>
   </div>
@@ -480,55 +493,53 @@
       playAudio(false);
     }
 
+    let attachedImageBase64 = "";
+    let callTimerInterval = null;
+    let callSeconds = 0;
+
+    // 通話受話（応答ボタンを押した瞬間：通話中UIへ移行）
     function acceptCall() {
-      document.getElementById('incoming-modal').classList.add('hidden');
-      playAudio(false);
-    }
+      // 1. 着信中ボタンを隠し、通話中UI（切断ボタンのみ＆タイマー）を表示
+      document.getElementById('incoming-actions').classList.add('hidden');
+      document.getElementById('in-call-actions').classList.remove('hidden');
+      document.getElementById('incoming-status-text').classList.add('hidden');
+      
+      const timerText = document.getElementById('call-timer-text');
+      timerText.classList.remove('hidden');
+      timerText.innerText = "00:00";
 
-    function declineCall() {
-      document.getElementById('incoming-modal').classList.add('hidden');
-      if (nativePlayer) { try { nativePlayer.stop(); } catch(e) {} }
-    }
+      // 2. 通話タイマーのカウントアップ開始
+      callSeconds = 0;
+      clearInterval(callTimerInterval);
+      callTimerInterval = setInterval(() => {
+        callSeconds++;
+        const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+        const s = String(callSeconds % 60).padStart(2, '0');
+        timerText.innerText = `${m}:${s}`;
+      }, 1000);
 
-    let attachedImageBase64 = ""; // 送信用に保持する添付画像データ
-
-    // メッセージ用の画像選択処理
-    function handleMessageImageAttach(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        attachedImageBase64 = e.target.result;
-        // プレビュー表示
-        document.getElementById('message-image-preview').src = attachedImageBase64;
-        document.getElementById('image-preview-container').classList.remove('hidden');
-      };
-      reader.readAsDataURL(file);
-    }
-
-    // 添付画像の削除処理
-    function removeAttachedImage() {
-      attachedImageBase64 = "";
-      document.getElementById('message-image-input').value = "";
-      document.getElementById('message-image-preview').src = "";
-      document.getElementById('image-preview-container').classList.add('hidden');
-    }
-
-    // 通話受話（カプセル開封）時：まずは音声のみ再生
-    function acceptCall() {
+      // 3. 写真を初期状態では隠し、受話器から音声再生を開始
       const imageContainer = document.getElementById('incoming-attached-image-container');
-      if (imageContainer) imageContainer.classList.add('hidden'); // まだ写真は表示しない
+      if (imageContainer) imageContainer.classList.add('hidden');
 
-      // 受話器での音声再生を開始（再生終了時に写真を自動表示）
       playAudio(false, true);
     }
 
-    // 通話終了・着信拒否時
+    // 通話終了・着信拒否時（UIのリセット）
     function declineCall() {
+      // タイマー停止
+      clearInterval(callTimerInterval);
+
+      // モード・表示を初期状態にリセット
       document.getElementById('incoming-modal').classList.add('hidden');
+      document.getElementById('incoming-actions').classList.remove('hidden');
+      document.getElementById('in-call-actions').classList.add('hidden');
+      document.getElementById('incoming-status-text').classList.remove('hidden');
+      document.getElementById('call-timer-text').classList.add('hidden');
+      
       const imageContainer = document.getElementById('incoming-attached-image-container');
       if (imageContainer) imageContainer.classList.add('hidden');
+      
       if (nativePlayer) { try { nativePlayer.stop(); } catch(e) {} }
     }
 
