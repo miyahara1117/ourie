@@ -12,15 +12,18 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-purple-500 selection:text-white">
 
-  <!-- ヘッダー -->
+  <!-- ヘッダー (左上タップで自分のプロフィール編集) -->
   <header class="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-sm">
-    <div class="flex items-center space-x-3">
-      <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 p-0.5 flex items-center justify-center shadow-inner">
+    <div onclick="editMyProfile()" class="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity">
+      <div class="relative w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 p-0.5 flex items-center justify-center shadow-inner">
         <img id="header-avatar" src="icon.png" onerror="this.src='https://via.placeholder.com/36'" class="w-full h-full rounded-full object-cover bg-slate-800" alt="App Icon">
+        <div class="absolute -bottom-0.5 -right-0.5 bg-purple-600 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] text-white">
+          <i class="fa-solid fa-pen"></i>
+        </div>
       </div>
       <div>
         <h1 class="font-bold text-base tracking-wide bg-gradient-to-r from-purple-400 to-indigo-300 bg-clip-text text-transparent">Ourie <span class="text-xs text-slate-400 font-normal">TIME CAPSULE</span></h1>
-        <p id="header-sender-name" class="text-[10px] text-slate-400">過去の自分</p>
+        <p id="header-sender-name" class="text-[10px] text-purple-300 font-medium">マイプロフィール: <span id="my-display-name">みや</span></p>
       </div>
     </div>
     <div class="bg-slate-800/80 border border-slate-700/60 rounded-full px-3 py-1 flex items-center space-x-1.5 shadow-sm">
@@ -428,10 +431,27 @@
       }, delay);
     }
 
-    // 着信発火処理
+    // マイプロフィール名（初期値）
+    let myName = "みや";
+
+    // 左上タップ時のプロフィール（名前）編集処理
+    function editMyProfile() {
+      const currentName = document.getElementById('my-display-name').innerText;
+      const newName = prompt("あなたの表示名を入力してください:", currentName);
+      if (newName && newName.trim() !== "") {
+        myName = newName.trim();
+        document.getElementById('my-display-name').innerText = myName;
+        const pName = document.getElementById('profile-name');
+        if (pName) pName.innerText = myName;
+      }
+    }
+
+    // 着信発火処理（「未来の自分へ」は"過去の自分" / 「友達へ」は設定した自分の名前を表示）
     function triggerIncomingCall() {
+      const displayName = (targetMode === 'self') ? "過去の自分" : myName;
+      document.getElementById('incoming-name').innerText = displayName;
+
       document.getElementById('incoming-modal').classList.remove('hidden');
-      // 着信音の受話器再生
       playAudio(false);
     }
 
