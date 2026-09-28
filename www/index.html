@@ -497,16 +497,53 @@
     let callTimerInterval = null;
     let callSeconds = 0;
 
+    // メッセージ用の画像選択処理（アルバムから写真を選択）
+    function handleMessageImageAttach(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        attachedImageBase64 = e.target.result;
+        // プレビュー画面の表示
+        const previewImg = document.getElementById('message-image-preview');
+        const container = document.getElementById('image-preview-container');
+        if (previewImg && container) {
+          previewImg.src = attachedImageBase64;
+          container.classList.remove('hidden');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // 添付画像の削除処理
+    function removeAttachedImage() {
+      attachedImageBase64 = "";
+      const input = document.getElementById('message-image-input');
+      const previewImg = document.getElementById('message-image-preview');
+      const container = document.getElementById('image-preview-container');
+
+      if (input) input.value = "";
+      if (previewImg) previewImg.src = "";
+      if (container) container.classList.add('hidden');
+    }
+
     // 通話受話（応答ボタンを押した瞬間：通話中UIへ移行）
     function acceptCall() {
       // 1. 着信中ボタンを隠し、通話中UI（切断ボタンのみ＆タイマー）を表示
-      document.getElementById('incoming-actions').classList.add('hidden');
-      document.getElementById('in-call-actions').classList.remove('hidden');
-      document.getElementById('incoming-status-text').classList.add('hidden');
-      
+      const actions = document.getElementById('incoming-actions');
+      const inCallActions = document.getElementById('in-call-actions');
+      const statusText = document.getElementById('incoming-status-text');
       const timerText = document.getElementById('call-timer-text');
-      timerText.classList.remove('hidden');
-      timerText.innerText = "00:00";
+
+      if (actions) actions.classList.add('hidden');
+      if (inCallActions) inCallActions.classList.remove('hidden');
+      if (statusText) statusText.classList.add('hidden');
+      
+      if (timerText) {
+        timerText.classList.remove('hidden');
+        timerText.innerText = "00:00";
+      }
 
       // 2. 通話タイマーのカウントアップ開始
       callSeconds = 0;
@@ -515,7 +552,7 @@
         callSeconds++;
         const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
         const s = String(callSeconds % 60).padStart(2, '0');
-        timerText.innerText = `${m}:${s}`;
+        if (timerText) timerText.innerText = `${m}:${s}`;
       }, 1000);
 
       // 3. 写真を初期状態では隠し、受話器から音声再生を開始
@@ -531,16 +568,23 @@
       clearInterval(callTimerInterval);
 
       // モード・表示を初期状態にリセット
-      document.getElementById('incoming-modal').classList.add('hidden');
-      document.getElementById('incoming-actions').classList.remove('hidden');
-      document.getElementById('in-call-actions').classList.add('hidden');
-      document.getElementById('incoming-status-text').classList.remove('hidden');
-      document.getElementById('call-timer-text').classList.add('hidden');
-      
+      const modal = document.getElementById('incoming-modal');
+      const actions = document.getElementById('incoming-actions');
+      const inCallActions = document.getElementById('in-call-actions');
+      const statusText = document.getElementById('incoming-status-text');
+      const timerText = document.getElementById('call-timer-text');
       const imageContainer = document.getElementById('incoming-attached-image-container');
+
+      if (modal) modal.classList.add('hidden');
+      if (actions) actions.classList.remove('hidden');
+      if (inCallActions) inCallActions.classList.add('hidden');
+      if (statusText) statusText.classList.remove('hidden');
+      if (timerText) timerText.classList.add('hidden');
       if (imageContainer) imageContainer.classList.add('hidden');
       
-      if (nativePlayer) { try { nativePlayer.stop(); } catch(e) {} }
+      if (nativePlayer) { 
+        try { nativePlayer.stop(); } catch(e) {} 
+      }
     }
 
     // 音声再生処理（onEndedShowImage パラメータ）
