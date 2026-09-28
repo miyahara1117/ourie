@@ -54,15 +54,21 @@
         </button>
       </div>
 
-      <!-- 送信者表示カード（左上のプロフィール名と自動連動） -->
+      <!-- 送信者プロフィールカード（左上プロフィールと完全連動） -->
       <div id="self-profile-card" class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between transition-all">
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-3 flex-1">
           <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
           <div>
-            <p id="profile-role" class="text-[10px] text-purple-400 font-medium">送信者プロフィール</p>
-            <p id="profile-name" class="text-xs font-bold text-slate-200">過去の自分</p>
+            <p id="profile-role" class="text-[10px] text-purple-400 font-medium">送信者名</p>
+            <p id="profile-name" class="text-xs font-bold text-slate-200">アウリー</p>
           </div>
         </div>
+
+        <!-- 友達宛て選択時のみ表示する上書き変更ボタン -->
+        <button id="custom-name-btn" type="button" onclick="editCustomSenderName()" class="hidden px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-purple-300 text-[11px] font-medium rounded-lg border border-slate-700/60 flex items-center space-x-1">
+          <i class="fa-solid fa-pen text-[9px]"></i>
+          <span>この送信での名前変更</span>
+        </button>
       </div>
 
       <!-- 友達指定エリア（「友達へ届ける」選択時に表示） -->
@@ -331,7 +337,7 @@
       syncProfileName();
     }
 
-    // カード表示名・ボタン表示状態の動的同期
+    // 左上の名前と送信者カードの完全連動ロジック
     function syncProfileName() {
       const pName = document.getElementById('profile-name');
       const pRole = document.getElementById('profile-role');
@@ -340,14 +346,16 @@
       if (!pName) return;
 
       if (targetMode === 'self') {
+        // 「未来の自分へ」選択時
         pName.innerText = "過去の自分";
-        if (pRole) pRole.innerText = "送信者プロフィール";
+        if (pRole) pRole.innerText = "送信者";
         if (customBtn) customBtn.classList.add('hidden');
       } else {
+        // 「友達へ届ける」選択時：左上の名前（みや/アウリー等）と完全自動連動
         const displayName = customSenderName ? customSenderName : masterMyName;
         pName.innerText = displayName;
         
-        if (pRole) pRole.innerText = customSenderName ? "送信者（この送信での変更名）" : "送信者（あなたのプロフィール）";
+        if (pRole) pRole.innerText = customSenderName ? "送信者（変更した名前）" : "送信者（マイプロフィール）";
         if (customBtn) customBtn.classList.remove('hidden');
       }
     }
