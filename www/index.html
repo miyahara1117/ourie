@@ -602,6 +602,7 @@
         nativePlayer = new Media(
           audioFilePath,
           () => {
+            // 再生正常終了時
             if (toggle && typeof toggle.setAudioMode === 'function') toggle.setAudioMode("speaker");
             if (onEndedShowImage) {
               showAttachedImageAfterAudio();
@@ -609,6 +610,7 @@
           },
           (err) => console.error(err),
           (status) => {
+            // MEDIA_STOPPED (ステータス 4) で表示
             if (status === 4 && onEndedShowImage) {
               showAttachedImageAfterAudio();
             }
@@ -616,11 +618,27 @@
         );
         nativePlayer.play();
       } else {
-        // テスト環境用フォールバック（3秒後に写真表示）
+        // テスト環境（ブラウザやMediaプラグインなし）の場合：3秒後に自動で写真表示
         if (onEndedShowImage) {
           setTimeout(() => {
             showAttachedImageAfterAudio();
           }, 3000);
+        }
+      }
+    }
+
+    // 音声終了後に添付写真を確実に表示する処理
+    function showAttachedImageAfterAudio() {
+      // 添付画像データが存在する場合のみ表示
+      if (attachedImageBase64 && attachedImageBase64 !== "") {
+        const img = document.getElementById('incoming-attached-image');
+        const container = document.getElementById('incoming-attached-image-container');
+        if (img && container) {
+          img.src = attachedImageBase64;
+          // hidden クラスを確実に除去
+          container.classList.remove('hidden');
+          // アニメーション表示用スタイル適用
+          container.className = "mt-4 rounded-2xl overflow-hidden border border-purple-500/40 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center transition-all duration-500 opacity-100 scale-100";
         }
       }
     }
