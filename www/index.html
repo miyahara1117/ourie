@@ -48,17 +48,24 @@
           <span>友達へ届ける</span>
         </button>
       </div>
-      <!-- プロフィール設定表示領域 -->
-      <div id="profile-card" class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+      <!-- プロフィール設定表示領域（タップで画像変更可能） -->
+      <div id="profile-card" onclick="document.getElementById('avatar-input').click()" class="bg-slate-950/60 border border-slate-800 hover:border-purple-500/50 rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all">
         <div class="flex items-center space-x-3">
-          <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
+          <div class="relative">
+            <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
+            <div class="absolute -bottom-1 -right-1 bg-purple-600 w-4 h-4 rounded-full flex items-center justify-center text-[8px] text-white">
+              <i class="fa-solid fa-camera"></i>
+            </div>
+          </div>
           <div>
-            <p id="profile-role" class="text-[10px] text-purple-400 font-medium">送信者プロフィール</p>
+            <p id="profile-role" class="text-[10px] text-purple-400 font-medium">送信者プロフィール（タップして変更）</p>
             <p id="profile-name" class="text-xs font-bold text-slate-200">過去の自分</p>
           </div>
         </div>
+        <i class="fa-solid fa-chevron-right text-xs text-slate-600"></i>
       </div>
-    </section>
+      <!-- 隠しファイル入力タグ -->
+      <input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="handleAvatarChange(event)">
 
     <!-- 2. 録音セクション -->
     <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm text-center">
@@ -298,6 +305,23 @@
     function declineCall() {
       document.getElementById('incoming-modal').classList.add('hidden');
       if (nativePlayer) { try { nativePlayer.stop(); } catch(e) {} }
+    }
+    // ユーザーが端末から写真を選択した時の処理
+    function handleAvatarChange(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const imageSrc = e.target.result;
+        // 1. プロフィールカードの画像を更新
+        document.getElementById('profile-avatar').src = imageSrc;
+        // 2. ヘッダーのアイコンを更新
+        document.getElementById('header-avatar').src = imageSrc;
+        // 3. 着信画面のアバターを更新
+        document.getElementById('incoming-avatar').src = imageSrc;
+      };
+      reader.readAsDataURL(file);
     }
   </script>
 </body>
