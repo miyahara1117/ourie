@@ -428,13 +428,12 @@
     // マイプロフィール名（初期値）
     let myName = "アウリー";
 
-    // マイプロフィール編集（左上タップ時：画像選択と名前入力を連続で起動）
+    // マイプロフィール編集（左上タップ時：画像選択）
     function editMyProfile() {
-      // 1. 画像選択ダイアログを開く
       document.getElementById('avatar-input').click();
     }
 
-    // 画像が選択された後に呼ばれる処理（画像反映 ＋ 名前入力プロンプト）
+    // 画像選択後に呼ばれる処理（画像更新 ＋ 名前変更ダイアログ）
     function handleAvatarChange(event) {
       const file = event.target.files[0];
       if (file) {
@@ -448,16 +447,51 @@
         reader.readAsDataURL(file);
       }
 
-      // 2. 画像選択後にそのまま表示名（名前）の変更画面を表示
+      // 画像選択直後に名前変更プロンプトを起動
       setTimeout(() => {
         const currentName = document.getElementById('my-display-name').innerText;
-        const newName = prompt("表示名を入力してください:", currentName);
+        const newName = prompt("あなたの表示名を入力してください:", currentName);
         if (newName && newName.trim() !== "") {
           const trimmed = newName.trim();
           document.getElementById('my-display-name').innerText = trimmed;
-          document.getElementById('profile-name').innerText = trimmed;
+          
+          // 「友達へ届ける」が選ばれている場合はカード表示名も即座に更新
+          if (targetMode === 'friend') {
+            document.getElementById('profile-name').innerText = trimmed;
+          }
         }
       }, 300);
+    }
+
+    // お届け先（「未来の自分へ」 / 「友達へ届ける」）切り替え処理
+    function selectTarget(mode) {
+      targetMode = mode;
+      const selfBtn = document.getElementById('target-self-btn');
+      const friendBtn = document.getElementById('target-friend-btn');
+      const selfProfileCard = document.getElementById('self-profile-card');
+      const friendSelectArea = document.getElementById('friend-select-area');
+      const pName = document.getElementById('profile-name');
+
+      if (mode === 'self') {
+        selfBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
+        friendBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
+        
+        if (selfProfileCard) selfProfileCard.classList.remove('hidden');
+        if (friendSelectArea) friendSelectArea.classList.add('hidden');
+        
+        // ★1. 「未来の自分へ」の時は送信者名を固定で「過去の自分」にする
+        if (pName) pName.innerText = "過去の自分";
+      } else {
+        friendBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
+        selfBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
+        
+        if (selfProfileCard) selfProfileCard.classList.add('hidden');
+        if (friendSelectArea) friendSelectArea.classList.remove('hidden');
+
+        // ★2. 「友達へ届ける」の時は左上で設定したマイプロフィール名にする
+        const myName = document.getElementById('my-display-name').innerText;
+        if (pName) pName.innerText = myName;
+      }
     }
 
     // 着信発火処理（「未来の自分へ」は"過去の自分" / 「友達へ」は設定した自分の名前を表示）
