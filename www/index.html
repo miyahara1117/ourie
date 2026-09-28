@@ -111,7 +111,7 @@
       <input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="handleAvatarChange(event)">
     </section>
     
-    <!-- 2. 録音セクション -->
+    <!-- 2. 録音＆画像添付セクション -->
     <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm text-center">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xs font-bold text-slate-400 flex items-center space-x-1.5">
@@ -121,6 +121,7 @@
         <span id="recording-timer" class="font-mono text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-full">00:00</span>
       </div>
 
+      <!-- マイクボタン -->
       <div class="my-3 flex justify-center">
         <button id="mic-btn" onclick="toggleRecording()" type="button" class="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 text-white flex flex-col items-center justify-center shadow-lg shadow-purple-900/30 active:scale-95 transition-all">
           <i id="mic-icon" class="fa-solid fa-microphone text-2xl"></i>
@@ -128,6 +129,7 @@
       </div>
       <p id="mic-status" class="text-xs font-medium text-slate-400 mt-2">タップして録音開始</p>
 
+      <!-- 音声確認エリア -->
       <div id="preview-area" class="hidden mt-4 pt-4 border-t border-slate-800/80 space-y-3">
         <div class="flex items-center justify-between text-xs text-slate-300 px-1">
           <span class="flex items-center space-x-1.5 font-medium">
@@ -146,6 +148,28 @@
             <span>スピーカー確認</span>
           </button>
         </div>
+      </div>
+
+      <!-- 画像添付エリア（新規追加） -->
+      <div class="mt-4 pt-4 border-t border-slate-800/80">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold text-slate-400 flex items-center space-x-1.5">
+            <i class="fa-regular fa-image text-indigo-400"></i>
+            <span>一緒にメッセージ写真を添える（任意）</span>
+          </span>
+          <button type="button" onclick="document.getElementById('message-image-input').click()" class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700/60 font-medium transition-all">
+            <i class="fa-solid fa-plus text-[10px] mr-1"></i>写真を選択
+          </button>
+        </div>
+
+        <!-- 添付画像プレビュー -->
+        <div id="image-preview-container" class="hidden relative mt-2 rounded-xl overflow-hidden border border-purple-500/30 max-h-48 bg-slate-950/80 flex items-center justify-center">
+          <img id="message-image-preview" src="" class="max-h-48 w-full object-contain">
+          <button type="button" onclick="removeAttachedImage()" class="absolute top-2 right-2 bg-slate-900/80 hover:bg-red-600 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs shadow-md transition-all">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <input type="file" id="message-image-input" accept="image/*" class="hidden" onchange="handleMessageImageAttach(event)">
       </div>
     </section>
 
@@ -182,17 +206,22 @@
 
   </main>
 
-  <!-- 着信モーダル（予約時間に自動起動） -->
-  <div id="incoming-modal" class="hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-lg flex flex-col items-center justify-between p-8">
-    <div class="pt-12 text-center space-y-3">
-      <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 p-1 mx-auto shadow-2xl animate-pulse">
+  <!-- 着信モーダル（画像添付対応） -->
+  <div id="incoming-modal" class="hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-lg flex flex-col items-center justify-between p-6 overflow-y-auto">
+    <div class="pt-8 text-center space-y-3 w-full max-w-sm">
+      <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 p-1 mx-auto shadow-2xl animate-pulse">
         <img id="incoming-avatar" src="icon.png" class="w-full h-full rounded-full object-cover">
       </div>
       <h3 id="incoming-name" class="text-xl font-bold text-white">過去の自分</h3>
       <p class="text-xs text-purple-400 animate-bounce">タイムカプセルが届きました</p>
+
+      <!-- 開封後に表示される添付画像メッセージ -->
+      <div id="incoming-attached-image-container" class="hidden mt-4 rounded-2xl overflow-hidden border border-purple-500/40 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center">
+        <img id="incoming-attached-image" src="" class="max-h-64 w-full object-contain">
+      </div>
     </div>
 
-    <div class="w-full max-w-xs pb-12 flex justify-around">
+    <div class="w-full max-w-xs py-8 flex justify-around">
       <button onclick="declineCall()" class="w-16 h-16 rounded-full bg-red-600 text-white flex items-center justify-center text-xl shadow-lg active:scale-95">
         <i class="fa-solid fa-phone-slash"></i>
       </button>
@@ -458,6 +487,52 @@
 
     function declineCall() {
       document.getElementById('incoming-modal').classList.add('hidden');
+      if (nativePlayer) { try { nativePlayer.stop(); } catch(e) {} }
+    }
+
+    let attachedImageBase64 = ""; // 送信用に保持する添付画像データ
+
+    // メッセージ用の画像選択処理
+    function handleMessageImageAttach(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        attachedImageBase64 = e.target.result;
+        // プレビュー表示
+        document.getElementById('message-image-preview').src = attachedImageBase64;
+        document.getElementById('image-preview-container').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // 添付画像の削除処理
+    function removeAttachedImage() {
+      attachedImageBase64 = "";
+      document.getElementById('message-image-input').value = "";
+      document.getElementById('message-image-preview').src = "";
+      document.getElementById('image-preview-container').classList.add('hidden');
+    }
+
+    // 通話受話（カプセル開封）時：音声再生 ＋ 添付画像があれば表示
+    function acceptCall() {
+      // 着信ボタン等の非表示（通話中画面への切り替え風）
+      if (attachedImageBase64) {
+        document.getElementById('incoming-attached-image').src = attachedImageBase64;
+        document.getElementById('incoming-attached-image-container').classList.remove('hidden');
+      } else {
+        document.getElementById('incoming-attached-image-container').classList.add('hidden');
+      }
+
+      // 受話器での音声再生
+      playAudio(false);
+    }
+
+    // 通話終了・着信拒否時
+    function declineCall() {
+      document.getElementById('incoming-modal').classList.add('hidden');
+      document.getElementById('incoming-attached-image-container').classList.add('hidden');
       if (nativePlayer) { try { nativePlayer.stop(); } catch(e) {} }
     }
   </script>
