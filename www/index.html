@@ -32,13 +32,15 @@
   <!-- メインコンテンツ -->
   <main class="flex-1 max-w-md w-full mx-auto px-4 py-5 space-y-5 pb-24">
 
-    <!-- 1. お届け先の選択＆プロフィール復元 -->
-    <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm">
-      <h2 class="text-xs font-bold text-slate-400 mb-3 flex items-center space-x-1.5">
+    <!-- 1. お届け先の選択＆プロフィール -->
+    <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm space-y-3">
+      <h2 class="text-xs font-bold text-slate-400 mb-2 flex items-center space-x-1.5">
         <i class="fa-solid fa-paper-plane text-purple-400"></i>
         <span>お届け先の選択</span>
       </h2>
-      <div class="grid grid-cols-2 gap-2 mb-3">
+
+      <!-- 自分 / 友達 切り替えボタン -->
+      <div class="grid grid-cols-2 gap-2">
         <button id="target-self-btn" onclick="selectTarget('self')" type="button" class="py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all">
           <i class="fa-solid fa-user"></i>
           <span>未来の自分へ</span>
@@ -48,8 +50,9 @@
           <span>友達へ届ける</span>
         </button>
       </div>
-      <!-- プロフィール設定表示領域（タップで画像変更可能） -->
-      <div id="profile-card" onclick="document.getElementById('avatar-input').click()" class="bg-slate-950/60 border border-slate-800 hover:border-purple-500/50 rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all">
+
+      <!-- プロフィール設定（自分へ送る場合） -->
+      <div id="self-profile-card" onclick="document.getElementById('avatar-input').click()" class="bg-slate-950/60 border border-slate-800 hover:border-purple-500/50 rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all">
         <div class="flex items-center space-x-3">
           <div class="relative">
             <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
@@ -58,15 +61,50 @@
             </div>
           </div>
           <div>
-            <p id="profile-role" class="text-[10px] text-purple-400 font-medium">送信者プロフィール（タップして変更）</p>
+            <p class="text-[10px] text-purple-400 font-medium">送信者（あなたの表示名）</p>
             <p id="profile-name" class="text-xs font-bold text-slate-200">過去の自分</p>
           </div>
         </div>
         <i class="fa-solid fa-chevron-right text-xs text-slate-600"></i>
       </div>
-      <!-- 隠しファイル入力タグ -->
-      <input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="handleAvatarChange(event)">
 
+      <!-- 友達指定エリア（「友達へ届ける」選択時に表示） -->
+      <div id="friend-select-area" class="hidden space-y-2 pt-1 border-t border-slate-800/80">
+        <!-- 友達リストから選択 -->
+        <div>
+          <label class="text-[10px] text-slate-400 font-medium mb-1 block">交換済みの友達から選ぶ</label>
+          <select id="friend-list-select" onchange="onFriendSelected(this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+            <option value="">-- 友達を選択してください --</option>
+            <option value="user_001" data-name="アリス" data-avatar="icon.png">アリス (ID: user_001)</option>
+            <option value="user_002" data-name="ボブ" data-avatar="icon.png">ボブ (ID: user_002)</option>
+          </select>
+        </div>
+
+        <!-- ユーザーID直接検索/入力 -->
+        <div>
+          <label class="text-[10px] text-slate-400 font-medium mb-1 block">または Ourie ID で直接指定</label>
+          <div class="flex space-x-2">
+            <input type="text" id="friend-id-input" placeholder="例: @ourie_user123" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+            <button type="button" onclick="searchFriendByID()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-xl text-purple-300 border border-slate-700/50">
+              検索
+            </button>
+          </div>
+        </div>
+
+        <!-- 選択中のお届け先ターゲット情報 -->
+        <div id="selected-recipient-badge" class="hidden bg-purple-950/40 border border-purple-500/30 rounded-xl p-2.5 flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <img id="recipient-avatar" src="icon.png" class="w-7 h-7 rounded-full object-cover">
+            <div>
+              <p class="text-[9px] text-purple-300 font-medium">送信先ユーザー</p>
+              <p id="recipient-name" class="text-xs font-bold text-white">---</p>
+            </div>
+          </div>
+          <span id="recipient-id-tag" class="text-[10px] font-mono text-purple-400 bg-purple-900/60 px-2 py-0.5 rounded-full">@id</span>
+        </div>
+      </div>
+    </section>
+    
     <!-- 2. 録音セクション -->
     <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm text-center">
       <div class="flex items-center justify-between mb-4">
@@ -172,24 +210,70 @@
     });
 
     // お届け先＆プロフィール制御
+    let recipientUserId = ""; // お届け先ユーザーID (空の場合は自分宛)
+    let recipientUserName = "過去の自分";
+
+    // お届け先（自分 / 友達）モードの切り替え
     function selectTarget(mode) {
       targetMode = mode;
       const selfBtn = document.getElementById('target-self-btn');
       const friendBtn = document.getElementById('target-friend-btn');
-      const pName = document.getElementById('profile-name');
-      const pRole = document.getElementById('profile-role');
+      const selfProfileCard = document.getElementById('self-profile-card');
+      const friendSelectArea = document.getElementById('friend-select-area');
 
       if (mode === 'self') {
         selfBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
         friendBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
-        pName.innerText = "過去の自分";
-        pRole.innerText = "送信者プロフィール";
+        
+        if (selfProfileCard) selfProfileCard.classList.remove('hidden');
+        if (friendSelectArea) friendSelectArea.classList.add('hidden');
+        
+        recipientUserId = "";
+        recipientUserName = "過去の自分";
       } else {
         friendBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
         selfBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
-        pName.innerText = "指定の友達";
-        pRole.innerText = "お届け先プロフィール";
+        
+        if (selfProfileCard) selfProfileCard.classList.add('hidden');
+        if (friendSelectArea) friendSelectArea.classList.remove('hidden');
       }
+    }
+
+    // 友達リストプルダウンから選択された時
+    function onFriendSelected(userId) {
+      if (!userId) return;
+      const select = document.getElementById('friend-list-select');
+      const selectedOption = select.options[select.selectedIndex];
+      
+      const name = selectedOption.getAttribute('data-name');
+      const avatar = selectedOption.getAttribute('data-avatar') || 'icon.png';
+
+      setRecipientInfo(userId, name, avatar);
+    }
+
+    // ID指定検索処理 (Firebase連携用の共通関数)
+    function searchFriendByID() {
+      const inputId = document.getElementById('friend-id-input').value.trim();
+      if (!inputId) return alert("ユーザーIDを入力してください");
+
+      setRecipientInfo(inputId, "検索ユーザー (" + inputId + ")", "icon.png");
+      alert("ID: " + inputId + " のユーザーをお届け先に設定しました");
+    }
+
+    // お届け先ユーザー情報の画面反映
+    function setRecipientInfo(id, name, avatar) {
+      recipientUserId = id;
+      recipientUserName = name;
+
+      const rName = document.getElementById('recipient-name');
+      const rId = document.getElementById('recipient-id-tag');
+      const rAvatar = document.getElementById('recipient-avatar');
+      const badge = document.getElementById('selected-recipient-badge');
+
+      if (rName) rName.innerText = name;
+      if (rId) rId.innerText = id;
+      if (rAvatar) rAvatar.src = avatar;
+      if (badge) badge.classList.remove('hidden');
     }
 
     function setTimeOffset(seconds) {
