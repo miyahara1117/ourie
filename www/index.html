@@ -54,13 +54,13 @@
         </button>
       </div>
 
-      <!-- 送信者表示カード（左上のマイプロフィール名と連動） -->
+      <!-- 送信者表示カード（左上のプロフィール名と自動連動） -->
       <div id="self-profile-card" class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between transition-all">
         <div class="flex items-center space-x-3">
           <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
           <div>
-            <p class="text-[10px] text-purple-400 font-medium">送信者（あなたのプロフィール）</p>
-            <p id="profile-name" class="text-xs font-bold text-slate-200">アウリー</p>
+            <p id="profile-role" class="text-[10px] text-purple-400 font-medium">送信者プロフィール</p>
+            <p id="profile-name" class="text-xs font-bold text-slate-200">過去の自分</p>
           </div>
         </div>
       </div>
@@ -259,35 +259,78 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       setTimeOffset(60);
+      // ページ読み込み時に左上の名前を送信者カードに初期反映
+      syncProfileName();
     });
 
-    // お届け先＆プロフィール制御
-    let recipientUserId = ""; // お届け先ユーザーID (空の場合は自分宛)
-    let recipientUserName = "過去の自分";
+    // マイプロフィール編集（左上タップ時）
+    function editMyProfile() {
+      document.getElementById('avatar-input').click();
+    }
 
-    // お届け先（自分 / 友達）モードの切り替え
+    // 画像選択・名前変更の反映
+    function handleAvatarChange(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const imageSrc = e.target.result;
+          document.getElementById('header-avatar').src = imageSrc;
+          document.getElementById('profile-avatar').src = imageSrc;
+          document.getElementById('incoming-avatar').src = imageSrc;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // 名前変更プロンプト
+      setTimeout(() => {
+        const currentName = document.getElementById('my-display-name').innerText;
+        const newName = prompt("あなたの表示名を入力してください:", currentName);
+        if (newName && newName.trim() !== "") {
+          const trimmed = newName.trim();
+          document.getElementById('my-display-name').innerText = trimmed;
+          syncProfileName(); // 名前変更時に即座に同期
+        }
+      }, 300);
+    }
+
+    // 「未来の自分へ」 / 「友達へ届ける」切り替え処理
     function selectTarget(mode) {
       targetMode = mode;
       const selfBtn = document.getElementById('target-self-btn');
       const friendBtn = document.getElementById('target-friend-btn');
-      const selfProfileCard = document.getElementById('self-profile-card');
       const friendSelectArea = document.getElementById('friend-select-area');
 
       if (mode === 'self') {
         selfBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
         friendBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
         
-        if (selfProfileCard) selfProfileCard.classList.remove('hidden');
         if (friendSelectArea) friendSelectArea.classList.add('hidden');
-        
-        recipientUserId = "";
-        recipientUserName = "過去の自分";
       } else {
         friendBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
         selfBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
         
-        if (selfProfileCard) selfProfileCard.classList.add('hidden');
         if (friendSelectArea) friendSelectArea.classList.remove('hidden');
+      }
+
+      // モード切り替え時に名前表示を連動
+      syncProfileName();
+    }
+
+    // 左上の名前とカード表示名を同期する共通関数
+    function syncProfileName() {
+      const pName = document.getElementById('profile-name');
+      const pRole = document.getElementById('profile-role');
+      
+      if (!pName) return;
+
+      if (targetMode === 'self') {
+        pName.innerText = "過去の自分";
+        if (pRole) pRole.innerText = "送信者プロフィール";
+      } else {
+        const myName = document.getElementById('my-display-name').innerText;
+        pName.innerText = myName;
+        if (pRole) pRole.innerText = "送信者（あなたのプロフィール）";
       }
     }
 
