@@ -257,18 +257,20 @@
     let nativePlayer = null;
     let targetMode = 'self';
 
+    let masterMyName = "アウリー"; // 初期表示名
+    let customSenderName = "";
+
     document.addEventListener('DOMContentLoaded', () => {
       setTimeOffset(60);
-      // ページ読み込み時に左上の名前を送信者カードに初期反映
       syncProfileName();
     });
 
-    // マイプロフィール編集（左上タップ時）
+    // 左上タップ：基本プロフィール（写真＆名前）の変更
     function editMyProfile() {
       document.getElementById('avatar-input').click();
     }
 
-    // 画像選択・名前変更の反映
+    // 画像選択完了後の処理（画像反映 ＋ 基本名前の変更プロンプト）
     function handleAvatarChange(event) {
       const file = event.target.files[0];
       if (file) {
@@ -282,19 +284,32 @@
         reader.readAsDataURL(file);
       }
 
-      // 名前変更プロンプト
+      // 名前入力ダイアログ
       setTimeout(() => {
-        const currentName = document.getElementById('my-display-name').innerText;
-        const newName = prompt("あなたの表示名を入力してください:", currentName);
+        const newName = prompt("基本の表示名（マイプロフィール）を入力してください:", masterMyName);
         if (newName && newName.trim() !== "") {
-          const trimmed = newName.trim();
-          document.getElementById('my-display-name').innerText = trimmed;
-          syncProfileName(); // 名前変更時に即座に同期
+          masterMyName = newName.trim();
+          document.getElementById('my-display-name').innerText = masterMyName;
+          
+          if (!customSenderName) {
+            syncProfileName();
+          }
         }
       }, 300);
     }
 
-    // 「未来の自分へ」 / 「友達へ届ける」切り替え処理
+    // 「友達へ届ける」時だけの個別名前変更機能
+    function editCustomSenderName() {
+      const current = customSenderName || masterMyName;
+      const input = prompt("この送信で表示する名前を入力してください（空欄で基本名に戻る）:", current);
+      
+      if (input !== null) {
+        customSenderName = input.trim();
+        syncProfileName();
+      }
+    }
+
+    // 「未来の自分へ」 / 「友達へ届ける」の切り替え処理
     function selectTarget(mode) {
       targetMode = mode;
       const selfBtn = document.getElementById('target-self-btn');
@@ -313,24 +328,27 @@
         if (friendSelectArea) friendSelectArea.classList.remove('hidden');
       }
 
-      // モード切り替え時に名前表示を連動
       syncProfileName();
     }
 
-    // 左上の名前とカード表示名を同期する共通関数
+    // カード表示名・ボタン表示状態の動的同期
     function syncProfileName() {
       const pName = document.getElementById('profile-name');
       const pRole = document.getElementById('profile-role');
-      
+      const customBtn = document.getElementById('custom-name-btn');
+
       if (!pName) return;
 
       if (targetMode === 'self') {
         pName.innerText = "過去の自分";
         if (pRole) pRole.innerText = "送信者プロフィール";
+        if (customBtn) customBtn.classList.add('hidden');
       } else {
-        const myName = document.getElementById('my-display-name').innerText;
-        pName.innerText = myName;
-        if (pRole) pRole.innerText = "送信者（あなたのプロフィール）";
+        const displayName = customSenderName ? customSenderName : masterMyName;
+        pName.innerText = displayName;
+        
+        if (pRole) pRole.innerText = customSenderName ? "送信者（この送信での変更名）" : "送信者（あなたのプロフィール）";
+        if (customBtn) customBtn.classList.remove('hidden');
       }
     }
 
@@ -346,7 +364,7 @@
       setRecipientInfo(userId, name, avatar);
     }
 
-    // ID指定検索処理 (Firebase連携用の共通関数)
+    // ID指定検索処理
     function searchFriendByID() {
       const inputId = document.getElementById('friend-id-input').value.trim();
       if (!inputId) return alert("ユーザーIDを入力してください");
@@ -450,7 +468,6 @@
       }
     }
 
-    // 着信予約機能（指定時間になったら自動で着信画面を呼び出す）
     function scheduleCapsule() {
       const inputVal = document.getElementById('target-time-input').value;
       if (!inputVal) return alert("お届け日時を選択してください");
@@ -462,185 +479,30 @@
 
       alert("タイムカプセルを予約しました！指定時間に着信します。");
 
-      // タイマー予約（バックグラウンド/フォアグラウンド両対応）
       setTimeout(() => {
         triggerIncomingCall();
       }, delay);
     }
 
-    // マイプロフィール名（初期値）
-    let myName = "アウリー";
-
-    // マイプロフィール編集（左上タップ時：画像選択）
-    function editMyProfile() {
-      document.getElementById('avatar-input').click();
-    }
-
-    // 画像選択・名前変更後に呼ばれる処理
-    function handleAvatarChange(event) {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const imageSrc = e.target.result;
-          document.getElementById('header-avatar').src = imageSrc;
-          document.getElementById('profile-avatar').src = imageSrc;
-          document.getElementById('incoming-avatar').src = imageSrc;
-        };
-        reader.readAsDataURL(file);
-      }
-
-      // 名前変更プロンプト
-      setTimeout(() => {
-        const currentName = document.getElementById('my-display-name').innerText;
-        const newName = prompt("あなたの表示名を入力してください:", currentName);
-        if (newName && newName.trim() !== "") {
-          const trimmed = newName.trim();
-          // 1. 左上ヘッダーの名前を更新
-          document.getElementById('my-display-name').innerText = trimmed;
-          
-          // 2. 「友達へ届ける」モードならカードの名前も即座に連動更新
-          if (targetMode === 'friend') {
-            document.getElementById('profile-name').innerText = trimmed;
-          }
-        }
-      }, 300);
-    }
-
-    // お届け先（「未来の自分へ」 / 「友達へ届ける」）切り替え処理
-    function selectTarget(mode) {
-      targetMode = mode;
-      const selfBtn = document.getElementById('target-self-btn');
-      const friendBtn = document.getElementById('target-friend-btn');
-      const selfProfileCard = document.getElementById('self-profile-card');
-      const friendSelectArea = document.getElementById('friend-select-area');
-      const pName = document.getElementById('profile-name');
-
-      if (mode === 'self') {
-        selfBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
-        friendBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
-        
-        if (selfProfileCard) selfProfileCard.classList.remove('hidden');
-        if (friendSelectArea) friendSelectArea.classList.add('hidden');
-        
-        // 「未来の自分へ」の時はカード名を「過去の自分」にする
-        if (pName) pName.innerText = "過去の自分";
-      } else {
-        friendBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
-        selfBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
-        
-        // ★修正ポイント: 「友達へ届ける」の時もカードを表示し、左上のマイプロフィール名を取得して連動させる
-        if (selfProfileCard) selfProfileCard.classList.remove('hidden');
-        if (friendSelectArea) friendSelectArea.classList.remove('hidden');
-
-        const currentMyName = document.getElementById('my-display-name').innerText;
-        if (pName) pName.innerText = currentMyName;
-      }
-    }
-
-    // お届け先（「未来の自分へ」 / 「友達へ届ける」）切り替え処理
-    function selectTarget(mode) {
-      targetMode = mode;
-      const selfBtn = document.getElementById('target-self-btn');
-      const friendBtn = document.getElementById('target-friend-btn');
-      const selfProfileCard = document.getElementById('self-profile-card');
-      const friendSelectArea = document.getElementById('friend-select-area');
-      const pName = document.getElementById('profile-name');
-
-      if (mode === 'self') {
-        selfBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
-        friendBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
-        
-        if (selfProfileCard) selfProfileCard.classList.remove('hidden');
-        if (friendSelectArea) friendSelectArea.classList.add('hidden');
-        
-        // ★1. 「未来の自分へ」の時は送信者名を固定で「過去の自分」にする
-        if (pName) pName.innerText = "過去の自分";
-      } else {
-        friendBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
-        selfBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
-        
-        if (selfProfileCard) selfProfileCard.classList.add('hidden');
-        if (friendSelectArea) friendSelectArea.classList.remove('hidden');
-
-        // ★2. 「友達へ届ける」の時は左上で設定したマイプロフィール名にする
-        const myName = document.getElementById('my-display-name').innerText;
-        if (pName) pName.innerText = myName;
-      }
-    }
-
-    // 着信発火処理（「未来の自分へ」は"過去の自分" / 「友達へ」は設定した自分の名前を表示）
     function triggerIncomingCall() {
-      const displayName = (targetMode === 'self') ? "過去の自分" : myName;
-      document.getElementById('incoming-name').innerText = displayName;
+      let displayName = "過去の自分";
+      if (targetMode === 'friend') {
+        displayName = customSenderName ? customSenderName : masterMyName;
+      }
 
+      document.getElementById('incoming-name').innerText = displayName;
       document.getElementById('incoming-modal').classList.remove('hidden');
       playAudio(false);
     }
 
     function acceptCall() {
       document.getElementById('incoming-modal').classList.add('hidden');
-      // 通話（メッセージ）受話器再生
       playAudio(false);
     }
 
     function declineCall() {
       document.getElementById('incoming-modal').classList.add('hidden');
       if (nativePlayer) { try { nativePlayer.stop(); } catch(e) {} }
-    }
-    // ユーザーが端末から写真を選択した時の処理
-    function handleAvatarChange(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const imageSrc = e.target.result;
-        // 1. プロフィールカードの画像を更新
-        document.getElementById('profile-avatar').src = imageSrc;
-        // 2. ヘッダーのアイコンを更新
-        document.getElementById('header-avatar').src = imageSrc;
-        // 3. 着信画面のアバターを更新
-        document.getElementById('incoming-avatar').src = imageSrc;
-      };
-      reader.readAsDataURL(file);
-    }
-    // 1. 自分の表示名変更処理
-    function editMyName() {
-      const currentName = document.getElementById('profile-name').innerText;
-      const newName = prompt("表示名を入力してください:", currentName);
-      if (newName && newName.trim() !== "") {
-        const trimmed = newName.trim();
-        document.getElementById('profile-name').innerText = trimmed;
-        document.getElementById('header-sender-name').innerText = trimmed;
-        document.getElementById('incoming-name').innerText = trimmed;
-      }
-    }
-
-    // 2. 友達の独自呼び名更新処理
-    function updateFriendNickname(nickname) {
-      if (!nickname || nickname.trim() === "") return;
-      const trimmed = nickname.trim();
-      recipientUserName = trimmed;
-      document.getElementById('recipient-name').innerText = trimmed;
-    }
-
-    // 3. 友達選択時に初期名と入力欄を同期（既存関数への上書き/拡張）
-    function setRecipientInfo(id, name, avatar) {
-      recipientUserId = id;
-      recipientUserName = name;
-
-      const rName = document.getElementById('recipient-name');
-      const rId = document.getElementById('recipient-id-tag');
-      const rAvatar = document.getElementById('recipient-avatar');
-      const badge = document.getElementById('selected-recipient-badge');
-      const nicknameInput = document.getElementById('recipient-nickname-input');
-
-      if (rName) rName.innerText = name;
-      if (rId) rId.innerText = id;
-      if (rAvatar) rAvatar.src = avatar;
-      if (nicknameInput) nicknameInput.value = name;
-      if (badge) badge.classList.remove('hidden');
     }
   </script>
 </body>
