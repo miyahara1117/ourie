@@ -54,64 +54,20 @@
         </button>
       </div>
 
-      <!-- 送信者プロフィールカード（左上プロフィールと完全連動） -->
+      <!-- 送信者プロフィールカード（単一・左上と完全自動連動） -->
       <div id="self-profile-card" class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between transition-all">
         <div class="flex items-center space-x-3 flex-1">
           <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
           <div>
-            <p id="profile-role" class="text-[10px] text-purple-400 font-medium">送信者名</p>
-            <p id="profile-name" class="text-xs font-bold text-slate-200">アウリー</p>
-          </div>
-        </div>
-
-        <!-- 友達宛て選択時のみ表示する上書き変更ボタン -->
-        <button id="custom-name-btn" type="button" onclick="editCustomSenderName()" class="hidden px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-purple-300 text-[11px] font-medium rounded-lg border border-slate-700/60 flex items-center space-x-1">
-          <i class="fa-solid fa-pen text-[9px]"></i>
-          <span>この送信での名前変更</span>
-        </button>
-      </div>
-
-      <!-- 友達指定エリア（「友達へ届ける」選択時に表示） -->
-      <div id="friend-select-area" class="hidden space-y-2 pt-1 border-t border-slate-800/80">
-        <!-- 友達リストから選択 -->
-        <div>
-          <label class="text-[10px] text-slate-400 font-medium mb-1 block">交換済みの友達から選ぶ</label>
-          <select id="friend-list-select" onchange="onFriendSelected(this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
-            <option value="">-- 友達を選択してください --</option>
-            <option value="user_001" data-name="アリス" data-avatar="icon.png">アリス (ID: user_001)</option>
-            <option value="user_002" data-name="ボブ" data-avatar="icon.png">ボブ (ID: user_002)</option>
-          </select>
-        </div>
-
-        <!-- ユーザーID直接検索/入力 -->
-        <div>
-          <label class="text-[10px] text-slate-400 font-medium mb-1 block">または Ourie ID で直接指定</label>
-          <div class="flex space-x-2">
-            <input type="text" id="friend-id-input" placeholder="例: @ourie_user123" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
-            <button type="button" onclick="searchFriendByID()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-xl text-purple-300 border border-slate-700/50">
-              検索
-            </button>
-          </div>
-        </div>
-
-        <!-- プロフィール設定（自分へ送る場合：タップで写真＆名前変更） -->
-      <div id="self-profile-card" class="bg-slate-950/60 border border-slate-800 hover:border-purple-500/50 rounded-xl p-3 flex items-center justify-between transition-all">
-        <div class="flex items-center space-x-3 flex-1 cursor-pointer" onclick="document.getElementById('avatar-input').click()">
-          <div class="relative">
-            <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
-            <div class="absolute -bottom-1 -right-1 bg-purple-600 w-4 h-4 rounded-full flex items-center justify-center text-[8px] text-white">
-              <i class="fa-solid fa-camera"></i>
-            </div>
-          </div>
-          <div>
-            <p class="text-[10px] text-purple-400 font-medium">送信者（タップして写真変更）</p>
+            <p id="profile-role" class="text-[10px] text-purple-400 font-medium">送信者</p>
             <p id="profile-name" class="text-xs font-bold text-slate-200">過去の自分</p>
           </div>
         </div>
-        <!-- 名前変更ボタン -->
-        <button type="button" onclick="editMyName()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium rounded-lg border border-slate-700/60 flex items-center space-x-1">
-          <i class="fa-solid fa-pen text-[9px] text-purple-400"></i>
-          <span>名前変更</span>
+
+        <!-- 友達宛て選択時のみ表示されるこの送信での上書き名前変更ボタン -->
+        <button id="custom-name-btn" type="button" onclick="editCustomSenderName()" class="hidden px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-purple-300 text-[11px] font-medium rounded-lg border border-slate-700/60 flex items-center space-x-1">
+          <i class="fa-solid fa-pen text-[9px]"></i>
+          <span>この送信での名前変更</span>
         </button>
       </div>
 
@@ -138,28 +94,20 @@
           </div>
         </div>
 
-        <!-- 選択中のお届け先ターゲット情報 & 独自呼び名変更 -->
-        <div id="selected-recipient-badge" class="hidden bg-purple-950/40 border border-purple-500/30 rounded-xl p-3 space-y-2">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2.5">
-              <img id="recipient-avatar" src="icon.png" class="w-8 h-8 rounded-full object-cover border border-purple-400/40">
-              <div>
-                <p class="text-[9px] text-purple-300 font-medium">送信先ユーザー</p>
-                <p id="recipient-name" class="text-xs font-bold text-white">---</p>
-              </div>
+        <!-- 選択中のお届け先ターゲット情報 -->
+        <div id="selected-recipient-badge" class="hidden bg-purple-950/40 border border-purple-500/30 rounded-xl p-2.5 flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <img id="recipient-avatar" src="icon.png" class="w-7 h-7 rounded-full object-cover">
+            <div>
+              <p class="text-[9px] text-purple-300 font-medium">送信先ユーザー</p>
+              <p id="recipient-name" class="text-xs font-bold text-white">---</p>
             </div>
-            <span id="recipient-id-tag" class="text-[10px] font-mono text-purple-400 bg-purple-900/60 px-2 py-0.5 rounded-full">@id</span>
           </div>
-
-          <!-- 友達の独自呼び名編集インプット -->
-          <div class="pt-1 border-t border-purple-900/40 flex items-center space-x-2">
-            <span class="text-[10px] text-slate-400 whitespace-nowrap">表示呼び名:</span>
-            <input type="text" id="recipient-nickname-input" onchange="updateFriendNickname(this.value)" placeholder="この友達の表示名（自分用）" class="flex-1 bg-slate-900/80 border border-purple-800/50 rounded-lg px-2 py-1 text-xs text-purple-200 focus:outline-none focus:border-purple-400">
-          </div>
+          <span id="recipient-id-tag" class="text-[10px] font-mono text-purple-400 bg-purple-900/60 px-2 py-0.5 rounded-full">@id</span>
         </div>
       </div>
 
-      <!-- 隠しファイル入力タグ（ここに追加） -->
+      <!-- 隠しファイル入力タグ -->
       <input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="handleAvatarChange(event)">
     </section>
     
