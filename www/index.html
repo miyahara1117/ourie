@@ -12,13 +12,13 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-purple-500 selection:text-white">
 
-  <!-- ヘッダー (左上タップで自分のプロフィール編集) -->
+  <!-- ヘッダー (左上タップで写真＆名前編集) -->
   <header class="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-sm">
     <div onclick="editMyProfile()" class="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity">
       <div class="relative w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 p-0.5 flex items-center justify-center shadow-inner">
         <img id="header-avatar" src="icon.png" onerror="this.src='https://via.placeholder.com/36'" class="w-full h-full rounded-full object-cover bg-slate-800" alt="App Icon">
-        <div class="absolute -bottom-0.5 -right-0.5 bg-purple-600 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] text-white">
-          <i class="fa-solid fa-pen"></i>
+        <div class="absolute -bottom-0.5 -right-0.5 bg-purple-600 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] text-white shadow">
+          <i class="fa-solid fa-camera"></i>
         </div>
       </div>
       <div>
@@ -54,21 +54,15 @@
         </button>
       </div>
 
-      <!-- プロフィール設定（自分へ送る場合） -->
-      <div id="self-profile-card" onclick="document.getElementById('avatar-input').click()" class="bg-slate-950/60 border border-slate-800 hover:border-purple-500/50 rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all">
+      <!-- 送信者表示カード（カメラマーク削除・表示専用） -->
+      <div id="self-profile-card" class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between transition-all">
         <div class="flex items-center space-x-3">
-          <div class="relative">
-            <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
-            <div class="absolute -bottom-1 -right-1 bg-purple-600 w-4 h-4 rounded-full flex items-center justify-center text-[8px] text-white">
-              <i class="fa-solid fa-camera"></i>
-            </div>
-          </div>
+          <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
           <div>
-            <p class="text-[10px] text-purple-400 font-medium">送信者（あなたの表示名）</p>
-            <p id="profile-name" class="text-xs font-bold text-slate-200">過去の自分</p>
+            <p class="text-[10px] text-purple-400 font-medium">送信者（左上アイコンから変更可能）</p>
+            <p id="profile-name" class="text-xs font-bold text-slate-200">みや</p>
           </div>
         </div>
-        <i class="fa-solid fa-chevron-right text-xs text-slate-600"></i>
       </div>
 
       <!-- 友達指定エリア（「友達へ届ける」選択時に表示） -->
@@ -434,16 +428,36 @@
     // マイプロフィール名（初期値）
     let myName = "アウリー";
 
-    // 左上タップ時のプロフィール（名前）編集処理
+    // マイプロフィール編集（左上タップ時：画像選択と名前入力を連続で起動）
     function editMyProfile() {
-      const currentName = document.getElementById('my-display-name').innerText;
-      const newName = prompt("あなたの表示名を入力してください:", currentName);
-      if (newName && newName.trim() !== "") {
-        myName = newName.trim();
-        document.getElementById('my-display-name').innerText = myName;
-        const pName = document.getElementById('profile-name');
-        if (pName) pName.innerText = myName;
+      // 1. 画像選択ダイアログを開く
+      document.getElementById('avatar-input').click();
+    }
+
+    // 画像が選択された後に呼ばれる処理（画像反映 ＋ 名前入力プロンプト）
+    function handleAvatarChange(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const imageSrc = e.target.result;
+          document.getElementById('header-avatar').src = imageSrc;
+          document.getElementById('profile-avatar').src = imageSrc;
+          document.getElementById('incoming-avatar').src = imageSrc;
+        };
+        reader.readAsDataURL(file);
       }
+
+      // 2. 画像選択後にそのまま表示名（名前）の変更画面を表示
+      setTimeout(() => {
+        const currentName = document.getElementById('my-display-name').innerText;
+        const newName = prompt("表示名を入力してください:", currentName);
+        if (newName && newName.trim() !== "") {
+          const trimmed = newName.trim();
+          document.getElementById('my-display-name').innerText = trimmed;
+          document.getElementById('profile-name').innerText = trimmed;
+        }
+      }, 300);
     }
 
     // 着信発火処理（「未来の自分へ」は"過去の自分" / 「友達へ」は設定した自分の名前を表示）
