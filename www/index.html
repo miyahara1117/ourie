@@ -110,7 +110,7 @@
       <!-- 隠しファイル入力タグ -->
       <input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="handleAvatarChange(event)">
     </section>
-    
+
     <!-- 2. 録音＆画像添付セクション -->
     <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm text-center">
       <div class="flex items-center justify-between mb-4">
@@ -150,7 +150,7 @@
         </div>
       </div>
 
-      <!-- 画像添付エリア（新規追加） -->
+      <!-- 画像添付エリア -->
       <div class="mt-4 pt-4 border-t border-slate-800/80">
         <div class="flex items-center justify-between mb-2">
           <span class="text-xs font-bold text-slate-400 flex items-center space-x-1.5">
@@ -255,6 +255,9 @@
 
     let masterMyName = "アウリー"; // 初期表示名
     let customSenderName = "";
+    let attachedImageBase64 = "";
+    let callTimerInterval = null;
+    let callSeconds = 0;
 
     document.addEventListener('DOMContentLoaded', () => {
       setTimeOffset(60);
@@ -336,12 +339,10 @@
       if (!pName) return;
 
       if (targetMode === 'self') {
-        // 「未来の自分へ」選択時
         pName.innerText = "過去の自分";
         if (pRole) pRole.innerText = "送信者";
         if (customBtn) customBtn.classList.add('hidden');
       } else {
-        // 「友達へ届ける」選択時：左上の名前（みや/アウリー等）と完全自動連動
         const displayName = customSenderName ? customSenderName : masterMyName;
         pName.innerText = displayName;
         
@@ -373,9 +374,6 @@
 
     // お届け先ユーザー情報の画面反映
     function setRecipientInfo(id, name, avatar) {
-      recipientUserId = id;
-      recipientUserName = name;
-
       const rName = document.getElementById('recipient-name');
       const rId = document.getElementById('recipient-id-tag');
       const rAvatar = document.getElementById('recipient-avatar');
@@ -451,21 +449,6 @@
       }
     }
 
-    function playAudio(forceSpeaker) {
-      if (nativePlayer) { try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} }
-      const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
-      if (toggle && typeof toggle.setAudioMode === 'function') {
-        toggle.setAudioMode(forceSpeaker ? "speaker" : "earpiece");
-      }
-      if (window.Media && audioFilePath) {
-        nativePlayer = new Media(audioFilePath,
-          () => { if (toggle && typeof toggle.setAudioMode === 'function') toggle.setAudioMode("speaker"); },
-          (err) => console.error(err)
-        );
-        nativePlayer.play();
-      }
-    }
-
     function scheduleCapsule() {
       const inputVal = document.getElementById('target-time-input').value;
       if (!inputVal) return alert("お届け日時を選択してください");
@@ -490,14 +473,9 @@
 
       document.getElementById('incoming-name').innerText = displayName;
       document.getElementById('incoming-modal').classList.remove('hidden');
-      playAudio(false);
     }
 
-    let attachedImageBase64 = "";
-    let callTimerInterval = null;
-    let callSeconds = 0;
-
-    // メッセージ用の画像選択処理（アルバムから写真を選択）
+    // メッセージ用の画像選択処理
     function handleMessageImageAttach(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -505,7 +483,6 @@
       const reader = new FileReader();
       reader.onload = function(e) {
         attachedImageBase64 = e.target.result;
-        // プレビュー画面の表示
         const previewImg = document.getElementById('message-image-preview');
         const container = document.getElementById('image-preview-container');
         if (previewImg && container) {
@@ -530,7 +507,6 @@
 
     // 通話受話（応答ボタンを押した瞬間：通話中UIへ移行）
     function acceptCall() {
-      // 1. 着信中ボタンを隠し、通話中UI（切断ボタンのみ＆タイマー）を表示
       const actions = document.getElementById('incoming-actions');
       const inCallActions = document.getElementById('in-call-actions');
       const statusText = document.getElementById('incoming-status-text');
@@ -545,7 +521,6 @@
         timerText.innerText = "00:00";
       }
 
-      // 2. 通話タイマーのカウントアップ開始
       callSeconds = 0;
       clearInterval(callTimerInterval);
       callTimerInterval = setInterval(() => {
@@ -555,19 +530,17 @@
         if (timerText) timerText.innerText = `${m}:${s}`;
       }, 1000);
 
-      // 3. 写真を初期状態では隠し、受話器から音声再生を開始
       const imageContainer = document.getElementById('incoming-attached-image-container');
       if (imageContainer) imageContainer.classList.add('hidden');
 
+      // 受話器再生開始＆音声終了時の写真開禁フラグをオン
       playAudio(false, true);
     }
 
-    // 通話終了・着信拒否時（UIのリセット）
+    // 通話終了・着信拒否時
     function declineCall() {
-      // タイマー停止
       clearInterval(callTimerInterval);
 
-      // モード・表示を初期状態にリセット
       const modal = document.getElementById('incoming-modal');
       const actions = document.getElementById('incoming-actions');
       const inCallActions = document.getElementById('in-call-actions');
@@ -583,11 +556,11 @@
       if (imageContainer) imageContainer.classList.add('hidden');
       
       if (nativePlayer) { 
-        try { nativePlayer.stop(); } catch(e) {} 
+        try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} 
       }
     }
 
-    // 音声再生処理（onEndedShowImage パラメータ）
+    // 音声再生処理（再生終了検知機能つき）
     function playAudio(forceSpeaker, onEndedShowImage = false) {
       if (nativePlayer) { 
         try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} 
@@ -602,7 +575,6 @@
         nativePlayer = new Media(
           audioFilePath,
           () => {
-            // 再生正常終了時
             if (toggle && typeof toggle.setAudioMode === 'function') toggle.setAudioMode("speaker");
             if (onEndedShowImage) {
               showAttachedImageAfterAudio();
@@ -610,7 +582,6 @@
           },
           (err) => console.error(err),
           (status) => {
-            // MEDIA_STOPPED (ステータス 4) で表示
             if (status === 4 && onEndedShowImage) {
               showAttachedImageAfterAudio();
             }
@@ -618,7 +589,7 @@
         );
         nativePlayer.play();
       } else {
-        // テスト環境（ブラウザやMediaプラグインなし）の場合：3秒後に自動で写真表示
+        // PCブラウザ等のテスト環境（Mediaプラグインなし）：3秒後に自動で写真解禁
         if (onEndedShowImage) {
           setTimeout(() => {
             showAttachedImageAfterAudio();
@@ -627,25 +598,9 @@
       }
     }
 
-    // 音声終了後に添付写真を確実に表示する処理
+    // 音声終了後に添付写真を解禁表示する処理
     function showAttachedImageAfterAudio() {
-      // 添付画像データが存在する場合のみ表示
       if (attachedImageBase64 && attachedImageBase64 !== "") {
-        const img = document.getElementById('incoming-attached-image');
-        const container = document.getElementById('incoming-attached-image-container');
-        if (img && container) {
-          img.src = attachedImageBase64;
-          // hidden クラスを確実に除去
-          container.classList.remove('hidden');
-          // アニメーション表示用スタイル適用
-          container.className = "mt-4 rounded-2xl overflow-hidden border border-purple-500/40 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center transition-all duration-500 opacity-100 scale-100";
-        }
-      }
-    }
-
-    // 音声終了後に添付写真をふわっと表示する処理
-    function showAttachedImageAfterAudio() {
-      if (attachedImageBase64) {
         const img = document.getElementById('incoming-attached-image');
         const container = document.getElementById('incoming-attached-image-container');
         if (img && container) {
