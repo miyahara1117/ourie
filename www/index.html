@@ -10,10 +10,10 @@
     body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-purple-500 selection:text-white">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-purple-500 selection:text-white pb-20">
 
-  <!-- ヘッダー (左上タップで写真＆名前編集) -->
-  <header class="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-sm">
+  <!-- ヘッダー -->
+  <header class="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-sm">
     <div onclick="editMyProfile()" class="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity">
       <div class="relative w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 p-0.5 flex items-center justify-center shadow-inner">
         <img id="header-avatar" src="icon.png" onerror="this.src='https://via.placeholder.com/36'" class="w-full h-full rounded-full object-cover bg-slate-800" alt="App Icon">
@@ -32,8 +32,8 @@
     </div>
   </header>
 
-  <!-- メインコンテンツ -->
-  <main class="flex-1 max-w-md w-full mx-auto px-4 py-5 space-y-5 pb-24">
+  <!-- PAGE 1: 作成（カプセル送信）ページ -->
+  <main id="page-create" class="flex-1 max-w-md w-full mx-auto px-4 py-5 space-y-5">
 
     <!-- 1. お届け先の選択＆プロフィール -->
     <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm space-y-3">
@@ -42,7 +42,6 @@
         <span>お届け先の選択</span>
       </h2>
 
-      <!-- 自分 / 友達 切り替えボタン -->
       <div class="grid grid-cols-2 gap-2">
         <button id="target-self-btn" onclick="selectTarget('self')" type="button" class="py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all">
           <i class="fa-solid fa-user"></i>
@@ -54,7 +53,6 @@
         </button>
       </div>
 
-      <!-- 送信者プロフィールカード -->
       <div id="self-profile-card" class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between transition-all">
         <div class="flex items-center space-x-3 flex-1">
           <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
@@ -70,7 +68,6 @@
         </button>
       </div>
 
-      <!-- 友達指定エリア -->
       <div id="friend-select-area" class="hidden space-y-2.5 pt-1 border-t border-slate-800/80">
         <div>
           <label class="text-[10px] text-slate-400 font-medium mb-1 block">交換済みの友達から選ぶ</label>
@@ -143,7 +140,6 @@
         </div>
       </div>
 
-      <!-- 画像添付エリア -->
       <div class="mt-4 pt-4 border-t border-slate-800/80">
         <div class="flex items-center justify-between mb-2">
           <span class="text-xs font-bold text-slate-400 flex items-center space-x-1.5">
@@ -195,24 +191,86 @@
         <span>未来の自分へタイムカプセルを予約する</span>
       </button>
     </div>
-
-    <!-- 5. 届いたタイムカプセル履歴 (カプセルボックス) -->
-    <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm space-y-3 mt-6">
-      <div class="flex items-center justify-between">
-        <h2 class="text-xs font-bold text-slate-400 flex items-center space-x-1.5">
-          <i class="fa-solid fa-box-archive text-purple-400"></i>
-          <span>届いたタイムカプセル履歴</span>
-        </h2>
-        <span id="history-count" class="text-[10px] text-purple-300 bg-purple-950/60 px-2 py-0.5 rounded-full font-mono">0件</span>
-      </div>
-
-      <div id="history-list" class="space-y-2.5">
-        <!-- 履歴が空のときの表示 -->
-        <p id="history-empty-text" class="text-xs text-slate-500 text-center py-4">届いたタイムカプセルはまだありません</p>
-      </div>
-    </section>
-
   </main>
+
+  <!-- PAGE 2: 届いたタイムカプセル一覧（専用ページ） -->
+  <main id="page-history" class="hidden flex-1 max-w-md w-full mx-auto px-4 py-5 space-y-4">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-sm font-bold text-slate-200 flex items-center space-x-2">
+        <i class="fa-solid fa-box-archive text-purple-400"></i>
+        <span>届いたタイムカプセル</span>
+      </h2>
+      <span id="history-count" class="text-xs text-purple-300 bg-purple-950/80 border border-purple-500/30 px-2.5 py-0.5 rounded-full font-mono">0件</span>
+    </div>
+
+    <!-- 履歴一覧リスト -->
+    <div id="history-list" class="space-y-3">
+      <p id="history-empty-text" class="text-xs text-slate-500 text-center py-12">届いたタイムカプセルはまだありません</p>
+    </div>
+  </main>
+
+  <!-- ボトムナビゲーション（タブ切り替え） -->
+  <nav class="fixed bottom-0 inset-x-0 bg-slate-900/90 backdrop-blur-lg border-t border-slate-800/80 z-30 flex justify-around py-2">
+    <button id="nav-btn-create" onclick="switchPage('create')" type="button" class="flex flex-col items-center space-y-1 text-purple-400 font-bold transition-all">
+      <i class="fa-solid fa-pen-to-square text-lg"></i>
+      <span class="text-[10px]">カプセル作成</span>
+    </button>
+    <button id="nav-btn-history" onclick="switchPage('history')" type="button" class="flex flex-col items-center space-y-1 text-slate-500 hover:text-slate-300 transition-all relative">
+      <i class="fa-solid fa-box-archive text-lg"></i>
+      <span class="text-[10px]">カプセル一覧</span>
+      <span id="nav-badge" class="hidden absolute -top-1 right-3 w-2 h-2 bg-purple-500 rounded-full animate-ping"></span>
+    </button>
+  </nav>
+
+  <!-- 個別詳細確認モーダル（一覧でタップした時） -->
+  <div id="detail-modal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-sm space-y-4 relative shadow-2xl max-h-[85vh] overflow-y-auto">
+      <button onclick="closeDetailModal()" class="absolute top-3 right-3 text-slate-400 hover:text-white text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="flex items-center space-x-3 pt-1">
+        <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 p-0.5">
+          <img id="detail-avatar" src="icon.png" class="w-full h-full rounded-full object-cover">
+        </div>
+        <div>
+          <h3 id="detail-sender-name" class="text-sm font-bold text-white">過去の自分</h3>
+          <p id="detail-date" class="text-[10px] text-slate-400 font-mono">2026/09/29 12:00</p>
+        </div>
+      </div>
+
+      <!-- 写真表示エリア -->
+      <div id="detail-image-container" class="hidden rounded-xl overflow-hidden border border-purple-500/30 bg-slate-950 max-h-60 flex items-center justify-center">
+        <img id="detail-image" src="" class="max-h-60 w-full object-contain">
+      </div>
+
+      <!-- 音声再生ボタン -->
+      <div class="grid grid-cols-2 gap-2 pt-2">
+        <button id="detail-play-earpiece-btn" onclick="" type="button" class="py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-md">
+          <i class="fa-solid fa-phone"></i>
+          <span>受話器で再生</span>
+        </button>
+        <button id="detail-play-speaker-btn" onclick="" type="button" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center space-x-1.5 border border-slate-700">
+          <i class="fa-solid fa-volume-high text-indigo-400"></i>
+          <span>スピーカー</span>
+        </button>
+      </div>
+
+      <!-- 返信一覧・返信ボタン -->
+      <div class="pt-3 border-t border-slate-800/80 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-400">返信ボイスメッセージ</span>
+          <button onclick="openReplyModalFromDetail()" type="button" class="text-xs text-purple-300 hover:text-purple-200 font-medium flex items-center space-x-1 bg-purple-950/60 border border-purple-500/30 px-2.5 py-1 rounded-lg">
+            <i class="fa-solid fa-reply text-[10px]"></i>
+            <span>返信する</span>
+          </button>
+        </div>
+        <div id="detail-reply-list" class="space-y-1.5 text-xs text-slate-300">
+          <!-- 返信ボイスがここに追加されます -->
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- 着信モーダル -->
   <div id="incoming-modal" class="hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-lg flex flex-col items-center justify-between p-6 overflow-y-auto">
@@ -225,12 +283,10 @@
       <p id="incoming-status-text" class="text-xs text-purple-400 animate-bounce">タイムカプセルが届きました</p>
       <p id="call-timer-text" class="hidden font-mono text-sm font-semibold text-green-400">00:00</p>
 
-      <!-- 着信画面の添付写真コンテナ -->
       <div id="incoming-attached-image-container" class="hidden mt-4 rounded-2xl overflow-hidden border border-purple-500/40 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center">
         <img id="incoming-attached-image" src="" class="max-h-64 w-full object-contain">
       </div>
 
-      <!-- 返信録音アクション（通話中/終了後に表示） -->
       <div id="reply-action-area" class="hidden mt-3">
         <button type="button" onclick="openReplyModal()" class="w-full py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-lg transition-all active:scale-95">
           <i class="fa-solid fa-reply"></i>
@@ -239,7 +295,6 @@
       </div>
     </div>
 
-    <!-- 着信応答前ボタン -->
     <div id="incoming-actions" class="w-full max-w-xs py-8 flex justify-around">
       <button onclick="declineCall()" class="w-16 h-16 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-xl shadow-lg active:scale-95">
         <i class="fa-solid fa-phone-slash"></i>
@@ -249,15 +304,14 @@
       </button>
     </div>
 
-    <!-- 通話中切断ボタン -->
-    <div id="in-call-actions" class="hidden w-full max-w-xs py-8 flex justify-center space-x-4">
+    <div id="in-call-actions" class="hidden w-full max-w-xs py-8 flex justify-center">
       <button onclick="declineCall()" class="w-16 h-16 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-xl shadow-lg active:scale-95">
         <i class="fa-solid fa-phone-slash"></i>
       </button>
     </div>
   </div>
 
-  <!-- 返信（ボイスレスポンス）専用モーダル -->
+  <!-- 返信モーダル -->
   <div id="reply-modal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-sm space-y-4 relative shadow-2xl">
       <button onclick="closeReplyModal()" class="absolute top-3 right-3 text-slate-400 hover:text-white text-lg">
@@ -299,11 +353,10 @@
     let callSeconds = 0;
     let imageAlreadyShown = false;
 
-    // 履歴管理用データ
-    let currentActiveCapsule = null; // 現在着信中のカプセル情報
+    let currentActiveCapsule = null;
+    let selectedDetailCapsule = null;
     let capsuleHistory = [];
 
-    // 返信録音用ステート
     let isReplyRecording = false;
     let replyTimer = null;
     let replySeconds = 0;
@@ -313,6 +366,29 @@
       syncProfileName();
       loadHistoryFromStorage();
     });
+
+    // タブ切り替え処理
+    function switchPage(page) {
+      const pageCreate = document.getElementById('page-create');
+      const pageHistory = document.getElementById('page-history');
+      const btnCreate = document.getElementById('nav-btn-create');
+      const btnHistory = document.getElementById('nav-btn-history');
+
+      if (page === 'create') {
+        pageCreate.classList.remove('hidden');
+        pageHistory.classList.add('hidden');
+        btnCreate.className = "flex flex-col items-center space-y-1 text-purple-400 font-bold transition-all";
+        btnHistory.className = "flex flex-col items-center space-y-1 text-slate-500 hover:text-slate-300 transition-all relative";
+      } else {
+        pageHistory.classList.remove('hidden');
+        pageCreate.classList.add('hidden');
+        btnHistory.className = "flex flex-col items-center space-y-1 text-purple-400 font-bold transition-all relative";
+        btnCreate.className = "flex flex-col items-center space-y-1 text-slate-500 hover:text-slate-300 transition-all";
+        
+        // バッジ非表示
+        document.getElementById('nav-badge').classList.add('hidden');
+      }
+    }
 
     function editMyProfile() {
       document.getElementById('avatar-input').click();
@@ -551,7 +627,6 @@
       }
 
       document.getElementById('incoming-name').innerText = currentActiveCapsule.senderName;
-      
       const imgContainer = document.getElementById('incoming-attached-image-container');
       if (imgContainer) imgContainer.classList.add('hidden');
       document.getElementById('reply-action-area').classList.add('hidden');
@@ -588,8 +663,9 @@
 
       playAudio(false);
 
-      // 受信したカプセルを履歴に保存
+      // 履歴保存＆バッジ点灯
       saveCapsuleToHistory(currentActiveCapsule);
+      document.getElementById('nav-badge').classList.remove('hidden');
 
       const delayMs = (recSeconds > 0) ? (recSeconds * 1000) : 3000;
       setTimeout(() => {
@@ -662,7 +738,7 @@
       }
     }
 
-    // --- 履歴（カプセルボックス）機能 ---
+    // --- 履歴・個別確認モーダルロジック ---
 
     function saveCapsuleToHistory(capsule) {
       if (!capsule) return;
@@ -702,65 +778,90 @@
       list.innerHTML = "";
       capsuleHistory.forEach(item => {
         const card = document.createElement('div');
-        card.className = "bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex flex-col space-y-2.5 transition-all";
-        
-        let replyHtml = "";
-        if (item.replies && item.replies.length > 0) {
-          replyHtml = `<div class="mt-2 pt-2 border-t border-slate-800/80 text-[10px] text-purple-300 flex items-center justify-between">
-            <span><i class="fa-solid fa-reply text-purple-400 mr-1"></i>返信ボイス (${item.replies.length}件)</span>
-            <button onclick="playAudio(true, '${item.replies[0].audio}')" class="text-xs text-purple-400 underline font-medium">返信声を聴く</button>
-          </div>`;
-        }
+        card.onclick = () => openDetailModal(item);
+        card.className = "bg-slate-900 border border-slate-800 hover:border-purple-500/40 rounded-xl p-3.5 flex items-center justify-between cursor-pointer transition-all active:scale-98 shadow-sm";
 
         card.innerHTML = `
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2.5">
-              <div class="w-8 h-8 rounded-full bg-purple-900/60 flex items-center justify-center text-purple-300 text-xs">
-                <i class="fa-solid fa-envelope-open"></i>
-              </div>
-              <div>
-                <p class="text-xs font-bold text-slate-200">${item.senderName}</p>
-                <p class="text-[10px] text-slate-500 font-mono">${item.date}</p>
-              </div>
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-900 to-slate-800 border border-purple-500/30 flex items-center justify-center text-purple-300">
+              <i class="fa-solid fa-envelope-open text-sm"></i>
             </div>
-            <button onclick="playHistoryAudio('${item.audioPath}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-medium flex items-center space-x-1 shadow-sm">
-              <i class="fa-solid fa-play text-[10px]"></i>
-              <span>声を聞く</span>
-            </button>
+            <div>
+              <p class="text-xs font-bold text-slate-100">${item.senderName}</p>
+              <p class="text-[10px] text-slate-400 font-mono mt-0.5">${item.date}</p>
+            </div>
           </div>
-          ${item.image ? `<div class="mt-1 rounded-lg overflow-hidden border border-slate-800 max-h-36 bg-slate-900 flex justify-center"><img src="${item.image}" class="max-h-36 object-contain"></div>` : ''}
-          <div class="flex justify-end pt-1">
-            <button onclick="openReplyModalForId('${item.id}', '${item.senderName}')" class="text-[11px] text-purple-300 hover:text-purple-200 font-medium flex items-center space-x-1 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-lg">
-              <i class="fa-solid fa-reply text-[9px]"></i>
-              <span>声で返信する</span>
-            </button>
+          <div class="flex items-center space-x-2">
+            ${item.image ? '<i class="fa-regular fa-image text-xs text-indigo-400"></i>' : ''}
+            ${item.replies && item.replies.length > 0 ? `<span class="text-[9px] bg-purple-950 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30 flex items-center space-x-1"><i class="fa-solid fa-reply text-[8px]"></i><span>${item.replies.length}</span></span>` : ''}
+            <i class="fa-solid fa-chevron-right text-xs text-slate-600"></i>
           </div>
-          ${replyHtml}
         `;
         list.appendChild(card);
       });
     }
 
-    function playHistoryAudio(path) {
-      if (!path) return alert("再生できる音声データがありません");
-      playAudio(false, path);
+    // 個別詳細モーダルを開く
+    function openDetailModal(item) {
+      selectedDetailCapsule = item;
+
+      document.getElementById('detail-sender-name').innerText = item.senderName;
+      document.getElementById('detail-date').innerText = item.date;
+
+      const imgContainer = document.getElementById('detail-image-container');
+      const img = document.getElementById('detail-image');
+      if (item.image) {
+        img.src = item.image;
+        imgContainer.classList.remove('hidden');
+      } else {
+        imgContainer.classList.add('hidden');
+      }
+
+      // 再生ボタンイベント設定
+      document.getElementById('detail-play-earpiece-btn').onclick = () => playAudio(false, item.audioPath);
+      document.getElementById('detail-play-speaker-btn').onclick = () => playAudio(true, item.audioPath);
+
+      // 返信リスト表示
+      const replyList = document.getElementById('detail-reply-list');
+      replyList.innerHTML = "";
+      if (item.replies && item.replies.length > 0) {
+        item.replies.forEach((rep, idx) => {
+          const repDiv = document.createElement('div');
+          repDiv.className = "bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between";
+          repDiv.innerHTML = `
+            <span class="text-[11px] text-purple-300 flex items-center space-x-1">
+              <i class="fa-solid fa-microphone text-[10px]"></i>
+              <span>返信ボイス #${idx + 1} (${rep.date})</span>
+            </span>
+            <button onclick="playAudio(true, '${rep.audio}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs text-purple-300 rounded-md font-medium">聴く</button>
+          `;
+          replyList.appendChild(repDiv);
+        });
+      } else {
+        replyList.innerHTML = `<p class="text-[11px] text-slate-500 py-1">返信ボイスはまだありません</p>`;
+      }
+
+      document.getElementById('detail-modal').classList.remove('hidden');
     }
 
-    // --- 返信（ボイスレスポンス）機能 ---
+    function closeDetailModal() {
+      document.getElementById('detail-modal').classList.add('hidden');
+    }
 
-    let replyTargetCapsuleId = null;
+    // --- 返信録音機能 ---
 
     function openReplyModal() {
       if (currentActiveCapsule) {
-        replyTargetCapsuleId = currentActiveCapsule.id;
+        selectedDetailCapsule = currentActiveCapsule;
         document.getElementById('reply-target-name').innerText = currentActiveCapsule.senderName;
       }
       document.getElementById('reply-modal').classList.remove('hidden');
     }
 
-    function openReplyModalForId(capsuleId, senderName) {
-      replyTargetCapsuleId = capsuleId;
-      document.getElementById('reply-target-name').innerText = senderName;
+    function openReplyModalFromDetail() {
+      if (selectedDetailCapsule) {
+        document.getElementById('reply-target-name').innerText = selectedDetailCapsule.senderName;
+      }
       document.getElementById('reply-modal').classList.remove('hidden');
     }
 
@@ -804,15 +905,18 @@
     function sendVoiceReply() {
       alert("返信ボイスを保存・送信しました！");
       
-      const target = capsuleHistory.find(item => item.id === replyTargetCapsuleId);
-      if (target) {
-        if (!target.replies) target.replies = [];
-        target.replies.push({
-          audio: audioFilePath,
-          date: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
-        });
-        localStorage.setItem('ourie_capsules', JSON.stringify(capsuleHistory));
-        renderHistory();
+      if (selectedDetailCapsule) {
+        const target = capsuleHistory.find(item => item.id === selectedDetailCapsule.id);
+        if (target) {
+          if (!target.replies) target.replies = [];
+          target.replies.push({
+            audio: audioFilePath,
+            date: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+          });
+          localStorage.setItem('ourie_capsules', JSON.stringify(capsuleHistory));
+          renderHistory();
+          openDetailModal(target); // 詳細モーダルを更新
+        }
       }
 
       closeReplyModal();
