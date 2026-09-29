@@ -479,8 +479,11 @@
       if (container) container.classList.add('hidden');
     }
 
+    let imageAlreadyShown = false; // 写真が既に表示されたかのフラグ
+
     // 通話受話（緑ボタンを押した時）
     function acceptCall() {
+      imageAlreadyShown = false;
       const actions = document.getElementById('incoming-actions');
       const inCallActions = document.getElementById('in-call-actions');
       const statusText = document.getElementById('incoming-status-text');
@@ -504,33 +507,51 @@
         if (timerText) timerText.innerText = `${m}:${s}`;
       }, 1000);
 
-      // 音声を再生（実機）
       playAudio(false);
 
-      // ★ 確実に写真を表示する処理：録音秒数（またはテスト用3秒）が経過した瞬間に写真表示
+      // 音声終了のタイミング（録音秒数または3秒後）で写真表示
       const delayMs = (recSeconds > 0) ? (recSeconds * 1000) : 3000;
       setTimeout(() => {
         showAttachedImageAfterAudio();
       }, delayMs);
     }
 
+    // 切断（赤ボタン押下）時：写真があればフェードイン表示、既に出ている・写真が無ければ閉じる
     function declineCall() {
       clearInterval(callTimerInterval);
+      if (nativePlayer) { 
+        try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} 
+      }
 
+      // 添付写真があり、まだ画面に出ていない場合は写真を表示して画面を維持
+      if (attachedImageBase64 && attachedImageBase64 !== "" && !imageAlreadyShown) {
+        showAttachedImageAfterAudio();
+        return; // モーダルは閉じずに写真を鑑賞できるように保持
+      }
+
+      // 写真が元々ない、または既に表示済みの場合はモーダルを閉じる
+      closeIncomingModal();
+    }
+
+    // 着信モーダルを完全に閉じるリセット処理
+    function closeIncomingModal() {
+      imageAlreadyShown = false;
       const modal = document.getElementById('incoming-modal');
       const actions = document.getElementById('incoming-actions');
       const inCallActions = document.getElementById('in-call-actions');
       const statusText = document.getElementById('incoming-status-text');
       const timerText = document.getElementById('call-timer-text');
+      const container = document.getElementById('incoming-attached-image-container');
 
       if (modal) modal.classList.add('hidden');
       if (actions) actions.classList.remove('hidden');
       if (inCallActions) inCallActions.classList.add('hidden');
       if (statusText) statusText.classList.remove('hidden');
       if (timerText) timerText.classList.add('hidden');
-      
-      if (nativePlayer) { 
-        try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} 
+      if (container) {
+        container.classList.add('hidden');
+        container.classList.remove('opacity-100', 'scale-100');
+        container.classList.add('opacity-0', 'scale-95');
       }
     }
 
@@ -556,14 +577,25 @@
       }
     }
 
-    // 添付写真を確実に解禁表示する処理
+    // 写真をふわっと（フェードイン＋ズームイン）表示する演出
     function showAttachedImageAfterAudio() {
-      if (attachedImageBase64 && attachedImageBase64 !== "") {
+      if (attachedImageBase64 && attachedImageBase64 !== "" && !imageAlreadyShown) {
+        imageAlreadyShown = true;
         const img = document.getElementById('incoming-attached-image');
         const container = document.getElementById('incoming-attached-image-container');
+        
         if (img && container) {
           img.src = attachedImageBase64;
+          
+          // 初期状態（透明＆少し縮小）
+          container.className = "mt-4 rounded-2xl overflow-hidden border border-purple-500/50 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center transition-all duration-700 ease-out opacity-0 scale-95";
           container.classList.remove('hidden');
+
+          // アニメーション発動（フェードイン＆ふわっと拡大）
+          setTimeout(() => {
+            container.classList.remove('opacity-0', 'scale-95');
+            container.classList.add('opacity-100', 'scale-100');
+          }, 50);
         }
       }
     }
