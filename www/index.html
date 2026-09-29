@@ -53,11 +53,18 @@
         </button>
       </div>
 
+      <!-- 送信者プロフィールカード (短縮形式 @ou_XXXXX の ID 表示 ＆ コピー機能) -->
       <div id="self-profile-card" class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between transition-all">
         <div class="flex items-center space-x-3 flex-1">
           <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
           <div>
-            <p id="profile-role" class="text-[10px] text-purple-400 font-medium">送信者</p>
+            <div class="flex items-center space-x-1.5">
+              <p id="profile-role" class="text-[10px] text-purple-400 font-medium">送信者</p>
+              <button type="button" onclick="copyMyID()" class="text-[9px] bg-purple-950/80 hover:bg-purple-900 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded font-mono flex items-center space-x-1">
+                <span id="my-ourie-id-display">@id</span>
+                <i class="fa-regular fa-copy text-[8px]"></i>
+              </button>
+            </div>
             <p id="profile-name" class="text-xs font-bold text-slate-200">過去の自分</p>
           </div>
         </div>
@@ -73,15 +80,15 @@
           <label class="text-[10px] text-slate-400 font-medium mb-1 block">交換済みの友達から選ぶ</label>
           <select id="friend-list-select" onchange="onFriendSelected(this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
             <option value="">-- 友達を選択してください --</option>
-            <option value="user_001" data-name="アリス" data-avatar="icon.png">アリス (ID: user_001)</option>
-            <option value="user_002" data-name="ボブ" data-avatar="icon.png">ボブ (ID: user_002)</option>
+            <option value="user_001" data-name="アリス" data-avatar="icon.png">アリス (ID: @ou_user1)</option>
+            <option value="user_002" data-name="ボブ" data-avatar="icon.png">ボブ (ID: @ou_user2)</option>
           </select>
         </div>
 
         <div>
           <label class="text-[10px] text-slate-400 font-medium mb-1 block">または Ourie ID で直接指定</label>
           <div class="flex space-x-2">
-            <input type="text" id="friend-id-input" placeholder="例: @ourie_user123" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+            <input type="text" id="friend-id-input" placeholder="例: @ou_x9a2f" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
             <button type="button" onclick="searchFriendByID()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-xl text-purple-300 border border-slate-700/50">
               検索
             </button>
@@ -203,13 +210,12 @@
       <span id="history-count" class="text-xs text-purple-300 bg-purple-950/80 border border-purple-500/30 px-2.5 py-0.5 rounded-full font-mono">0件</span>
     </div>
 
-    <!-- 履歴一覧リスト -->
     <div id="history-list" class="space-y-3">
       <p id="history-empty-text" class="text-xs text-slate-500 text-center py-12">届いたタイムカプセルはまだありません</p>
     </div>
   </main>
 
-  <!-- ボトムナビゲーション（タブ切り替え） -->
+  <!-- ボトムナビゲーション -->
   <nav class="fixed bottom-0 inset-x-0 bg-slate-900/90 backdrop-blur-lg border-t border-slate-800/80 z-30 flex justify-around py-2">
     <button id="nav-btn-create" onclick="switchPage('create')" type="button" class="flex flex-col items-center space-y-1 text-purple-400 font-bold transition-all">
       <i class="fa-solid fa-pen-to-square text-lg"></i>
@@ -222,7 +228,7 @@
     </button>
   </nav>
 
-  <!-- 個別詳細確認モーダル（一覧でタップした時） -->
+  <!-- 個別詳細確認モーダル -->
   <div id="detail-modal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-sm space-y-4 relative shadow-2xl max-h-[85vh] overflow-y-auto">
       <button onclick="closeDetailModal()" class="absolute top-3 right-3 text-slate-400 hover:text-white text-lg">
@@ -239,12 +245,10 @@
         </div>
       </div>
 
-      <!-- 写真表示エリア -->
       <div id="detail-image-container" class="hidden rounded-xl overflow-hidden border border-purple-500/30 bg-slate-950 max-h-60 flex items-center justify-center">
         <img id="detail-image" src="" class="max-h-60 w-full object-contain">
       </div>
 
-      <!-- 音声再生ボタン -->
       <div class="grid grid-cols-2 gap-2 pt-2">
         <button id="detail-play-earpiece-btn" onclick="" type="button" class="py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-md">
           <i class="fa-solid fa-phone"></i>
@@ -256,7 +260,6 @@
         </button>
       </div>
 
-      <!-- 返信一覧・返信ボタン -->
       <div class="pt-3 border-t border-slate-800/80 space-y-2">
         <div class="flex items-center justify-between">
           <span class="text-xs font-bold text-slate-400">返信ボイスメッセージ</span>
@@ -346,6 +349,7 @@
     let targetMode = 'self';
 
     let masterMyName = "アウリー";
+    let myOurieID = "";
     let customSenderName = "";
     let attachedImageBase64 = "";
     let callTimerInterval = null;
@@ -362,10 +366,11 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
       setTimeOffset(60);
+      initMyOurieID();
       syncProfileName();
       loadHistoryFromStorage();
 
-      // Capacitor ローカル通知の初期化＆通知タップイベント連動
+      // Capacitor ローカル通知初期化
       if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
         const { LocalNotifications } = window.Capacitor.Plugins;
         try {
@@ -376,6 +381,29 @@
         } catch(e) { console.error(e); }
       }
     });
+
+    // 自分の Ourie ID を初期化・保存（@ou_XXXXX 形式）
+    function initMyOurieID() {
+      let savedID = localStorage.getItem('my_ourie_id');
+      // 旧 @ourie_ 形式、または未設定の場合は新形式 @ou_ で自動更新・作成
+      if (!savedID || savedID.startsWith('@ourie_')) {
+        const randomHex = Math.random().toString(36).substring(2, 7);
+        savedID = `@ou_${randomHex}`;
+        localStorage.setItem('my_ourie_id', savedID);
+      }
+      myOurieID = savedID;
+      const displayElem = document.getElementById('my-ourie-id-display');
+      if (displayElem) displayElem.innerText = myOurieID;
+    }
+
+    // 自分のOurie IDをクリップボードにコピー
+    function copyMyID() {
+      navigator.clipboard.writeText(myOurieID).then(() => {
+        alert(`あなたの Ourie ID (${myOurieID}) をコピーしました！友達に共有してください。`);
+      }).catch(() => {
+        alert(`あなたの Ourie ID は [ ${myOurieID} ] です。`);
+      });
+    }
 
     function switchPage(page) {
       const pageCreate = document.getElementById('page-create');
@@ -415,7 +443,7 @@
       }
 
       setTimeout(() => {
-        const newName = prompt("基本の表示名（マイプロフィール）を入力してください:", masterMyName);
+        const newName = prompt(`基本の表示名を入力してください (現在のID: ${myOurieID}):`, masterMyName);
         if (newName && newName.trim() !== "") {
           masterMyName = newName.trim();
           document.getElementById('my-display-name').innerText = masterMyName;
@@ -614,7 +642,6 @@
         replies: []
       };
 
-      // OSローカル通知登録（バックグラウンド/閉じている状態対応）
       if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
         const { LocalNotifications } = window.Capacitor.Plugins;
         try {
@@ -631,7 +658,7 @@
         } catch(e) { console.error(e); }
       }
 
-      alert("タイムカプセルを予約しました！アプリを閉じていても指定時間に着信通知が届きます。");
+      alert(`タイムカプセルを予約しました！ (あなたのID: ${myOurieID})`);
 
       setTimeout(() => {
         triggerIncomingCall();
@@ -771,8 +798,6 @@
       }
     }
 
-    // --- 履歴・個別確認モーダルロジック ---
-
     function saveCapsuleToHistory(capsule) {
       if (!capsule) return;
       const exists = capsuleHistory.some(item => item.id === capsule.id);
@@ -877,8 +902,6 @@
     function closeDetailModal() {
       document.getElementById('detail-modal').classList.add('hidden');
     }
-
-    // --- 返信録音機能 ---
 
     function openReplyModal() {
       if (currentActiveCapsule) {
