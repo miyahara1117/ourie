@@ -360,10 +360,21 @@
     let replyTimer = null;
     let replySeconds = 0;
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       setTimeOffset(60);
       syncProfileName();
       loadHistoryFromStorage();
+
+      // Capacitor ローカル通知の初期化＆通知タップイベント連動
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+        const { LocalNotifications } = window.Capacitor.Plugins;
+        try {
+          await LocalNotifications.requestPermissions();
+          LocalNotifications.addListener('localNotificationActionPerformed', () => {
+            triggerIncomingCall();
+          });
+        } catch(e) { console.error(e); }
+      }
     });
 
     function switchPage(page) {
@@ -580,7 +591,7 @@
       if (container) container.classList.add('hidden');
     }
 
-    function scheduleCapsule() {
+    async function scheduleCapsule() {
       const inputVal = document.getElementById('target-time-input').value;
       if (!inputVal) return alert("お届け日時を選択してください");
 
@@ -603,7 +614,24 @@
         replies: []
       };
 
-      alert("タイムカプセルを予約しました！指定時間に着信します。");
+      // OSローカル通知登録（バックグラウンド/閉じている状態対応）
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+        const { LocalNotifications } = window.Capacitor.Plugins;
+        try {
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                title: "タイムカプセルが届きました",
+                body: `${displayName} から着信メッセージがあります`,
+                id: Math.floor(Math.random() * 100000),
+                schedule: { at: new Date(targetTime) }
+              }
+            ]
+          });
+        } catch(e) { console.error(e); }
+      }
+
+      alert("タイムカプセルを予約しました！アプリを閉じていても指定時間に着信通知が届きます。");
 
       setTimeout(() => {
         triggerIncomingCall();
@@ -630,7 +658,6 @@
       document.getElementById('incoming-modal').classList.remove('hidden');
     }
 
-    // 通話受話（緑ボタンを押した時）
     function acceptCall() {
       imageAlreadyShown = false;
       const actions = document.getElementById('incoming-actions');
@@ -705,7 +732,6 @@
       if (timerText) timerText.classList.add('hidden');
     }
 
-    // 写真をフェードイン＋ズームインで「ふわっと」浮き出させる処理
     function showAttachedImageAfterAudio() {
       if (attachedImageBase64 && attachedImageBase64 !== "" && !imageAlreadyShown) {
         imageAlreadyShown = true;
