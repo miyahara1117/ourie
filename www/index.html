@@ -634,6 +634,7 @@
       document.getElementById('incoming-modal').classList.remove('hidden');
     }
 
+    // 通話受話（緑ボタンを押した時）
     function acceptCall() {
       imageAlreadyShown = false;
       const actions = document.getElementById('incoming-actions');
@@ -641,12 +642,19 @@
       const statusText = document.getElementById('incoming-status-text');
       const timerText = document.getElementById('call-timer-text');
       const replyArea = document.getElementById('reply-action-area');
+      const imgContainer = document.getElementById('incoming-attached-image-container');
 
       if (actions) actions.classList.add('hidden');
       if (inCallActions) inCallActions.classList.remove('hidden');
       if (statusText) statusText.classList.add('hidden');
       if (replyArea) replyArea.classList.remove('hidden');
       
+      // 写真は初期状態で透明＆少し縮小して準備
+      if (imgContainer) {
+        imgContainer.classList.add('hidden');
+        imgContainer.className = "hidden mt-4 rounded-2xl overflow-hidden border border-purple-500/40 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center transition-all duration-700 opacity-0 scale-95";
+      }
+
       if (timerText) {
         timerText.classList.remove('hidden');
         timerText.innerText = "00:00";
@@ -667,6 +675,7 @@
       saveCapsuleToHistory(currentActiveCapsule);
       document.getElementById('nav-badge').classList.remove('hidden');
 
+      // 録音秒数（またはテスト用3秒後）に「ふわっと」写真を解禁表示
       const delayMs = (recSeconds > 0) ? (recSeconds * 1000) : 3000;
       setTimeout(() => {
         showAttachedImageAfterAudio();
@@ -701,6 +710,23 @@
       if (inCallActions) inCallActions.classList.add('hidden');
       if (statusText) statusText.classList.remove('hidden');
       if (timerText) timerText.classList.add('hidden');
+    }
+
+    // 写真をフェードイン＋ズームインで「ふわっと」浮き出させる処理
+    function showAttachedImageAfterAudio() {
+      if (attachedImageBase64 && attachedImageBase64 !== "" && !imageAlreadyShown) {
+        imageAlreadyShown = true;
+        const img = document.getElementById('incoming-attached-image');
+        const container = document.getElementById('incoming-attached-image-container');
+        if (img && container) {
+          img.src = attachedImageBase64;
+          container.classList.remove('hidden');
+          
+          setTimeout(() => {
+            container.className = "mt-4 rounded-2xl overflow-hidden border border-purple-500/40 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center transition-all duration-700 ease-out opacity-100 scale-100";
+          }, 50);
+        }
+      }
     }
 
     function playAudio(forceSpeaker, customPath = null) {
