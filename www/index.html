@@ -54,7 +54,7 @@
         </button>
       </div>
 
-      <!-- 送信者プロフィールカード（単一・左上と完全自動連動） -->
+      <!-- 送信者プロフィールカード -->
       <div id="self-profile-card" class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between transition-all">
         <div class="flex items-center space-x-3 flex-1">
           <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
@@ -64,16 +64,14 @@
           </div>
         </div>
 
-        <!-- 友達宛て選択時のみ表示されるこの送信での上書き名前変更ボタン -->
         <button id="custom-name-btn" type="button" onclick="editCustomSenderName()" class="hidden px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-purple-300 text-[11px] font-medium rounded-lg border border-slate-700/60 flex items-center space-x-1">
           <i class="fa-solid fa-pen text-[9px]"></i>
           <span>この送信での名前変更</span>
         </button>
       </div>
 
-      <!-- 友達指定エリア（「友達へ届ける」選択時に表示） -->
+      <!-- 友達指定エリア -->
       <div id="friend-select-area" class="hidden space-y-2.5 pt-1 border-t border-slate-800/80">
-        <!-- 友達リストから選択 -->
         <div>
           <label class="text-[10px] text-slate-400 font-medium mb-1 block">交換済みの友達から選ぶ</label>
           <select id="friend-list-select" onchange="onFriendSelected(this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
@@ -83,7 +81,6 @@
           </select>
         </div>
 
-        <!-- ユーザーID直接検索/入力 -->
         <div>
           <label class="text-[10px] text-slate-400 font-medium mb-1 block">または Ourie ID で直接指定</label>
           <div class="flex space-x-2">
@@ -94,7 +91,6 @@
           </div>
         </div>
 
-        <!-- 選択中のお届け先ターゲット情報 -->
         <div id="selected-recipient-badge" class="hidden bg-purple-950/40 border border-purple-500/30 rounded-xl p-2.5 flex items-center justify-between">
           <div class="flex items-center space-x-2.5">
             <img id="recipient-avatar" src="icon.png" class="w-7 h-7 rounded-full object-cover">
@@ -107,7 +103,6 @@
         </div>
       </div>
 
-      <!-- 隠しファイル入力タグ -->
       <input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="handleAvatarChange(event)">
     </section>
 
@@ -121,7 +116,6 @@
         <span id="recording-timer" class="font-mono text-xs text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-full">00:00</span>
       </div>
 
-      <!-- マイクボタン -->
       <div class="my-3 flex justify-center">
         <button id="mic-btn" onclick="toggleRecording()" type="button" class="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 text-white flex flex-col items-center justify-center shadow-lg shadow-purple-900/30 active:scale-95 transition-all">
           <i id="mic-icon" class="fa-solid fa-microphone text-2xl"></i>
@@ -129,7 +123,6 @@
       </div>
       <p id="mic-status" class="text-xs font-medium text-slate-400 mt-2">タップして録音開始</p>
 
-      <!-- 音声確認エリア -->
       <div id="preview-area" class="hidden mt-4 pt-4 border-t border-slate-800/80 space-y-3">
         <div class="flex items-center justify-between text-xs text-slate-300 px-1">
           <span class="flex items-center space-x-1.5 font-medium">
@@ -162,7 +155,6 @@
           </button>
         </div>
 
-        <!-- 添付画像プレビュー -->
         <div id="image-preview-container" class="hidden relative mt-2 rounded-xl overflow-hidden border border-purple-500/30 max-h-48 bg-slate-950/80 flex items-center justify-center">
           <img id="message-image-preview" src="" class="max-h-48 w-full object-contain">
           <button type="button" onclick="removeAttachedImage()" class="absolute top-2 right-2 bg-slate-900/80 hover:bg-red-600 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs shadow-md transition-all">
@@ -206,7 +198,7 @@
 
   </main>
 
-  <!-- 着信モーダル（通話中画面・タイマー対応） -->
+  <!-- 着信モーダル -->
   <div id="incoming-modal" class="hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-lg flex flex-col items-center justify-between p-6 overflow-y-auto">
     <div class="pt-8 text-center space-y-3 w-full max-w-sm">
       <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 p-1 mx-auto shadow-2xl">
@@ -214,19 +206,16 @@
       </div>
       <h3 id="incoming-name" class="text-xl font-bold text-white">過去の自分</h3>
       
-      <!-- 着信中テキスト -->
       <p id="incoming-status-text" class="text-xs text-purple-400 animate-bounce">タイムカプセルが届きました</p>
-      
-      <!-- 通話中経過タイマー（応答後に表示） -->
       <p id="call-timer-text" class="hidden font-mono text-sm font-semibold text-green-400">00:00</p>
 
-      <!-- 音声完了後に表示される添付写真 -->
+      <!-- 着信画面の添付写真コンテナ -->
       <div id="incoming-attached-image-container" class="hidden mt-4 rounded-2xl overflow-hidden border border-purple-500/40 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center">
         <img id="incoming-attached-image" src="" class="max-h-64 w-full object-contain">
       </div>
     </div>
 
-    <!-- 着信応答前のボタンエリア -->
+    <!-- 着信応答前ボタン -->
     <div id="incoming-actions" class="w-full max-w-xs py-8 flex justify-around">
       <button onclick="declineCall()" class="w-16 h-16 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-xl shadow-lg active:scale-95">
         <i class="fa-solid fa-phone-slash"></i>
@@ -236,7 +225,7 @@
       </button>
     </div>
 
-    <!-- 応答後（通話中）の切断ボタンのみのエリア -->
+    <!-- 通話中切断ボタン -->
     <div id="in-call-actions" class="hidden w-full max-w-xs py-8 flex justify-center">
       <button onclick="declineCall()" class="w-16 h-16 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-xl shadow-lg active:scale-95">
         <i class="fa-solid fa-phone-slash"></i>
@@ -253,9 +242,9 @@
     let nativePlayer = null;
     let targetMode = 'self';
 
-    let masterMyName = "アウリー"; // 初期表示名
+    let masterMyName = "アウリー";
     let customSenderName = "";
-    let attachedImageBase64 = "";
+    let attachedImageBase64 = ""; // 画像データ保持
     let callTimerInterval = null;
     let callSeconds = 0;
 
@@ -264,12 +253,10 @@
       syncProfileName();
     });
 
-    // 左上タップ：基本プロフィール（写真＆名前）の変更
     function editMyProfile() {
       document.getElementById('avatar-input').click();
     }
 
-    // 画像選択完了後の処理
     function handleAvatarChange(event) {
       const file = event.target.files[0];
       if (file) {
@@ -288,10 +275,7 @@
         if (newName && newName.trim() !== "") {
           masterMyName = newName.trim();
           document.getElementById('my-display-name').innerText = masterMyName;
-          
-          if (!customSenderName) {
-            syncProfileName();
-          }
+          if (!customSenderName) syncProfileName();
         }
       }, 300);
     }
@@ -299,7 +283,6 @@
     function editCustomSenderName() {
       const current = customSenderName || masterMyName;
       const input = prompt("この送信で表示する名前を入力してください（空欄で基本名に戻る）:", current);
-      
       if (input !== null) {
         customSenderName = input.trim();
         syncProfileName();
@@ -459,10 +442,15 @@
       }
 
       document.getElementById('incoming-name').innerText = displayName;
+      
+      // 着信時は画像を一旦隠して着信画面を表示
+      const imgContainer = document.getElementById('incoming-attached-image-container');
+      if (imgContainer) imgContainer.classList.add('hidden');
+
       document.getElementById('incoming-modal').classList.remove('hidden');
     }
 
-    // メッセージ用の画像選択処理
+    // メッセージ用画像選択処理
     function handleMessageImageAttach(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -491,7 +479,7 @@
       if (container) container.classList.add('hidden');
     }
 
-    // 通話受話（応答ボタンを押した瞬間：通話中UIへ移行 ＋ 音声再生＆写真表示予約）
+    // 通話受話（緑ボタンを押した時）
     function acceptCall() {
       const actions = document.getElementById('incoming-actions');
       const inCallActions = document.getElementById('in-call-actions');
@@ -516,13 +504,10 @@
         if (timerText) timerText.innerText = `${m}:${s}`;
       }, 1000);
 
-      const imageContainer = document.getElementById('incoming-attached-image-container');
-      if (imageContainer) imageContainer.classList.add('hidden');
-
-      // ★ 音声を再生しつつ、音声の長さ（録音秒数recSeconds）に合わせて写真を確実に解禁するロジック
+      // 音声を再生（実機）
       playAudio(false);
 
-      // 録音データがある場合は録音秒数後、ないテスト時は3秒後に確実に写真を表示
+      // ★ 確実に写真を表示する処理：録音秒数（またはテスト用3秒）が経過した瞬間に写真表示
       const delayMs = (recSeconds > 0) ? (recSeconds * 1000) : 3000;
       setTimeout(() => {
         showAttachedImageAfterAudio();
@@ -537,14 +522,12 @@
       const inCallActions = document.getElementById('in-call-actions');
       const statusText = document.getElementById('incoming-status-text');
       const timerText = document.getElementById('call-timer-text');
-      const imageContainer = document.getElementById('incoming-attached-image-container');
 
       if (modal) modal.classList.add('hidden');
       if (actions) actions.classList.remove('hidden');
       if (inCallActions) inCallActions.classList.add('hidden');
       if (statusText) statusText.classList.remove('hidden');
       if (timerText) timerText.classList.add('hidden');
-      if (imageContainer) imageContainer.classList.add('hidden');
       
       if (nativePlayer) { 
         try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} 
@@ -573,7 +556,7 @@
       }
     }
 
-    // 添付写真を解禁表示する処理
+    // 添付写真を確実に解禁表示する処理
     function showAttachedImageAfterAudio() {
       if (attachedImageBase64 && attachedImageBase64 !== "") {
         const img = document.getElementById('incoming-attached-image');
@@ -581,7 +564,6 @@
         if (img && container) {
           img.src = attachedImageBase64;
           container.classList.remove('hidden');
-          container.className = "mt-4 rounded-2xl overflow-hidden border border-purple-500/40 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center transition-all duration-700 opacity-100 scale-100";
         }
       }
     }
