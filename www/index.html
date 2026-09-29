@@ -196,6 +196,22 @@
       </button>
     </div>
 
+    <!-- 5. 届いたタイムカプセル履歴 (カプセルボックス) -->
+    <section class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-sm space-y-3 mt-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xs font-bold text-slate-400 flex items-center space-x-1.5">
+          <i class="fa-solid fa-box-archive text-purple-400"></i>
+          <span>届いたタイムカプセル履歴</span>
+        </h2>
+        <span id="history-count" class="text-[10px] text-purple-300 bg-purple-950/60 px-2 py-0.5 rounded-full font-mono">0件</span>
+      </div>
+
+      <div id="history-list" class="space-y-2.5">
+        <!-- 履歴が空のときの表示 -->
+        <p id="history-empty-text" class="text-xs text-slate-500 text-center py-4">届いたタイムカプセルはまだありません</p>
+      </div>
+    </section>
+
   </main>
 
   <!-- 着信モーダル -->
@@ -213,6 +229,14 @@
       <div id="incoming-attached-image-container" class="hidden mt-4 rounded-2xl overflow-hidden border border-purple-500/40 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center">
         <img id="incoming-attached-image" src="" class="max-h-64 w-full object-contain">
       </div>
+
+      <!-- 返信録音アクション（通話中/終了後に表示） -->
+      <div id="reply-action-area" class="hidden mt-3">
+        <button type="button" onclick="openReplyModal()" class="w-full py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-lg transition-all active:scale-95">
+          <i class="fa-solid fa-reply"></i>
+          <span>届いた声に返信する</span>
+        </button>
+      </div>
     </div>
 
     <!-- 着信応答前ボタン -->
@@ -226,9 +250,35 @@
     </div>
 
     <!-- 通話中切断ボタン -->
-    <div id="in-call-actions" class="hidden w-full max-w-xs py-8 flex justify-center">
+    <div id="in-call-actions" class="hidden w-full max-w-xs py-8 flex justify-center space-x-4">
       <button onclick="declineCall()" class="w-16 h-16 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-xl shadow-lg active:scale-95">
         <i class="fa-solid fa-phone-slash"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- 返信（ボイスレスポンス）専用モーダル -->
+  <div id="reply-modal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-sm space-y-4 relative shadow-2xl">
+      <button onclick="closeReplyModal()" class="absolute top-3 right-3 text-slate-400 hover:text-white text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <h3 class="text-sm font-bold text-purple-300 flex items-center space-x-2">
+        <i class="fa-solid fa-reply"></i>
+        <span><span id="reply-target-name">過去の自分</span> へ声の返信</span>
+      </h3>
+
+      <div class="text-center py-3">
+        <button id="reply-mic-btn" onclick="toggleReplyRecording()" type="button" class="w-16 h-16 mx-auto rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center text-2xl shadow-lg active:scale-95 transition-all">
+          <i id="reply-mic-icon" class="fa-solid fa-microphone"></i>
+        </button>
+        <p id="reply-status" class="text-xs text-slate-400 mt-2">タップして返信ボイスを録音</p>
+        <p id="reply-timer" class="font-mono text-xs text-purple-400 font-semibold mt-1">00:00</p>
+      </div>
+
+      <button id="send-reply-btn" onclick="sendVoiceReply()" disabled type="button" class="w-full py-3 bg-slate-800 text-slate-500 text-xs font-bold rounded-xl flex items-center justify-center space-x-1.5 transition-all cursor-not-allowed">
+        <i class="fa-solid fa-paper-plane"></i>
+        <span>返信ボイスを保存・送信</span>
       </button>
     </div>
   </div>
@@ -244,13 +294,24 @@
 
     let masterMyName = "アウリー";
     let customSenderName = "";
-    let attachedImageBase64 = ""; // 画像データ保持
+    let attachedImageBase64 = "";
     let callTimerInterval = null;
     let callSeconds = 0;
+    let imageAlreadyShown = false;
+
+    // 履歴管理用データ
+    let currentActiveCapsule = null; // 現在着信中のカプセル情報
+    let capsuleHistory = [];
+
+    // 返信録音用ステート
+    let isReplyRecording = false;
+    let replyTimer = null;
+    let replySeconds = 0;
 
     document.addEventListener('DOMContentLoaded', () => {
       setTimeOffset(60);
       syncProfileName();
+      loadHistoryFromStorage();
     });
 
     function editMyProfile() {
@@ -419,38 +480,6 @@
       }
     }
 
-    function scheduleCapsule() {
-      const inputVal = document.getElementById('target-time-input').value;
-      if (!inputVal) return alert("お届け日時を選択してください");
-
-      const targetTime = new Date(inputVal).getTime();
-      const delay = targetTime - Date.now();
-
-      if (delay <= 0) return alert("未来の日時を選択してください");
-
-      alert("タイムカプセルを予約しました！指定時間に着信します。");
-
-      setTimeout(() => {
-        triggerIncomingCall();
-      }, delay);
-    }
-
-    function triggerIncomingCall() {
-      let displayName = "過去の自分";
-      if (targetMode === 'friend') {
-        displayName = customSenderName ? customSenderName : masterMyName;
-      }
-
-      document.getElementById('incoming-name').innerText = displayName;
-      
-      // 着信時は画像を一旦隠して着信画面を表示
-      const imgContainer = document.getElementById('incoming-attached-image-container');
-      if (imgContainer) imgContainer.classList.add('hidden');
-
-      document.getElementById('incoming-modal').classList.remove('hidden');
-    }
-
-    // メッセージ用画像選択処理
     function handleMessageImageAttach(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -479,19 +508,69 @@
       if (container) container.classList.add('hidden');
     }
 
-    let imageAlreadyShown = false; // 写真が既に表示されたかのフラグ
+    function scheduleCapsule() {
+      const inputVal = document.getElementById('target-time-input').value;
+      if (!inputVal) return alert("お届け日時を選択してください");
 
-    // 通話受話（緑ボタンを押した時）
+      const targetTime = new Date(inputVal).getTime();
+      const delay = targetTime - Date.now();
+
+      if (delay <= 0) return alert("未来の日時を選択してください");
+
+      let displayName = "過去の自分";
+      if (targetMode === 'friend') {
+        displayName = customSenderName ? customSenderName : masterMyName;
+      }
+
+      currentActiveCapsule = {
+        id: "capsule_" + Date.now(),
+        senderName: displayName,
+        audioPath: audioFilePath,
+        image: attachedImageBase64,
+        date: new Date().toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        replies: []
+      };
+
+      alert("タイムカプセルを予約しました！指定時間に着信します。");
+
+      setTimeout(() => {
+        triggerIncomingCall();
+      }, delay);
+    }
+
+    function triggerIncomingCall() {
+      if (!currentActiveCapsule) {
+        currentActiveCapsule = {
+          id: "capsule_" + Date.now(),
+          senderName: "過去の自分",
+          audioPath: audioFilePath,
+          image: attachedImageBase64,
+          date: new Date().toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          replies: []
+        };
+      }
+
+      document.getElementById('incoming-name').innerText = currentActiveCapsule.senderName;
+      
+      const imgContainer = document.getElementById('incoming-attached-image-container');
+      if (imgContainer) imgContainer.classList.add('hidden');
+      document.getElementById('reply-action-area').classList.add('hidden');
+
+      document.getElementById('incoming-modal').classList.remove('hidden');
+    }
+
     function acceptCall() {
       imageAlreadyShown = false;
       const actions = document.getElementById('incoming-actions');
       const inCallActions = document.getElementById('in-call-actions');
       const statusText = document.getElementById('incoming-status-text');
       const timerText = document.getElementById('call-timer-text');
+      const replyArea = document.getElementById('reply-action-area');
 
       if (actions) actions.classList.add('hidden');
       if (inCallActions) inCallActions.classList.remove('hidden');
       if (statusText) statusText.classList.add('hidden');
+      if (replyArea) replyArea.classList.remove('hidden');
       
       if (timerText) {
         timerText.classList.remove('hidden');
@@ -509,31 +588,30 @@
 
       playAudio(false);
 
-      // 音声終了のタイミング（録音秒数または3秒後）で写真表示
+      // 受信したカプセルを履歴に保存
+      saveCapsuleToHistory(currentActiveCapsule);
+
       const delayMs = (recSeconds > 0) ? (recSeconds * 1000) : 3000;
       setTimeout(() => {
         showAttachedImageAfterAudio();
       }, delayMs);
     }
 
-    // 切断（赤ボタン押下）時：写真があればフェードイン表示、既に出ている・写真が無ければ閉じる
     function declineCall() {
       clearInterval(callTimerInterval);
       if (nativePlayer) { 
         try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} 
       }
 
-      // 添付写真があり、まだ画面に出ていない場合は写真を表示して画面を維持
       if (attachedImageBase64 && attachedImageBase64 !== "" && !imageAlreadyShown) {
         showAttachedImageAfterAudio();
-        return; // モーダルは閉じずに写真を鑑賞できるように保持
+        saveCapsuleToHistory(currentActiveCapsule);
+        return;
       }
 
-      // 写真が元々ない、または既に表示済みの場合はモーダルを閉じる
       closeIncomingModal();
     }
 
-    // 着信モーダルを完全に閉じるリセット処理
     function closeIncomingModal() {
       imageAlreadyShown = false;
       const modal = document.getElementById('incoming-modal');
@@ -541,33 +619,28 @@
       const inCallActions = document.getElementById('in-call-actions');
       const statusText = document.getElementById('incoming-status-text');
       const timerText = document.getElementById('call-timer-text');
-      const container = document.getElementById('incoming-attached-image-container');
 
       if (modal) modal.classList.add('hidden');
       if (actions) actions.classList.remove('hidden');
       if (inCallActions) inCallActions.classList.add('hidden');
       if (statusText) statusText.classList.remove('hidden');
       if (timerText) timerText.classList.add('hidden');
-      if (container) {
-        container.classList.add('hidden');
-        container.classList.remove('opacity-100', 'scale-100');
-        container.classList.add('opacity-0', 'scale-95');
-      }
     }
 
-    function playAudio(forceSpeaker) {
+    function playAudio(forceSpeaker, customPath = null) {
       if (nativePlayer) { 
         try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} 
       }
       
+      const targetPath = customPath || audioFilePath;
       const toggle = window.AudioToggle || (window.cordova && window.cordova.plugins && window.cordova.plugins.AudioToggle);
       if (toggle && typeof toggle.setAudioMode === 'function') {
         toggle.setAudioMode(forceSpeaker ? "speaker" : "earpiece");
       }
 
-      if (window.Media && audioFilePath) {
+      if (window.Media && targetPath) {
         nativePlayer = new Media(
-          audioFilePath,
+          targetPath,
           () => {
             if (toggle && typeof toggle.setAudioMode === 'function') toggle.setAudioMode("speaker");
           },
@@ -577,27 +650,173 @@
       }
     }
 
-    // 写真をふわっと（フェードイン＋ズームイン）表示する演出
     function showAttachedImageAfterAudio() {
       if (attachedImageBase64 && attachedImageBase64 !== "" && !imageAlreadyShown) {
         imageAlreadyShown = true;
         const img = document.getElementById('incoming-attached-image');
         const container = document.getElementById('incoming-attached-image-container');
-        
         if (img && container) {
           img.src = attachedImageBase64;
-          
-          // 初期状態（透明＆少し縮小）
-          container.className = "mt-4 rounded-2xl overflow-hidden border border-purple-500/50 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center transition-all duration-700 ease-out opacity-0 scale-95";
           container.classList.remove('hidden');
-
-          // アニメーション発動（フェードイン＆ふわっと拡大）
-          setTimeout(() => {
-            container.classList.remove('opacity-0', 'scale-95');
-            container.classList.add('opacity-100', 'scale-100');
-          }, 50);
         }
       }
+    }
+
+    // --- 履歴（カプセルボックス）機能 ---
+
+    function saveCapsuleToHistory(capsule) {
+      if (!capsule) return;
+      const exists = capsuleHistory.some(item => item.id === capsule.id);
+      if (!exists) {
+        capsuleHistory.unshift(capsule);
+        renderHistory();
+        localStorage.setItem('ourie_capsules', JSON.stringify(capsuleHistory));
+      }
+    }
+
+    function loadHistoryFromStorage() {
+      const saved = localStorage.getItem('ourie_capsules');
+      if (saved) {
+        try {
+          capsuleHistory = JSON.parse(saved);
+          renderHistory();
+        } catch(e) { console.error(e); }
+      }
+    }
+
+    function renderHistory() {
+      const list = document.getElementById('history-list');
+      const count = document.getElementById('history-count');
+      const emptyText = document.getElementById('history-empty-text');
+
+      if (!list) return;
+      count.innerText = `${capsuleHistory.length}件`;
+
+      if (capsuleHistory.length === 0) {
+        if (emptyText) emptyText.classList.remove('hidden');
+        return;
+      } else {
+        if (emptyText) emptyText.classList.add('hidden');
+      }
+
+      list.innerHTML = "";
+      capsuleHistory.forEach(item => {
+        const card = document.createElement('div');
+        card.className = "bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex flex-col space-y-2.5 transition-all";
+        
+        let replyHtml = "";
+        if (item.replies && item.replies.length > 0) {
+          replyHtml = `<div class="mt-2 pt-2 border-t border-slate-800/80 text-[10px] text-purple-300 flex items-center justify-between">
+            <span><i class="fa-solid fa-reply text-purple-400 mr-1"></i>返信ボイス (${item.replies.length}件)</span>
+            <button onclick="playAudio(true, '${item.replies[0].audio}')" class="text-xs text-purple-400 underline font-medium">返信声を聴く</button>
+          </div>`;
+        }
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-8 h-8 rounded-full bg-purple-900/60 flex items-center justify-center text-purple-300 text-xs">
+                <i class="fa-solid fa-envelope-open"></i>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-slate-200">${item.senderName}</p>
+                <p class="text-[10px] text-slate-500 font-mono">${item.date}</p>
+              </div>
+            </div>
+            <button onclick="playHistoryAudio('${item.audioPath}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-medium flex items-center space-x-1 shadow-sm">
+              <i class="fa-solid fa-play text-[10px]"></i>
+              <span>声を聞く</span>
+            </button>
+          </div>
+          ${item.image ? `<div class="mt-1 rounded-lg overflow-hidden border border-slate-800 max-h-36 bg-slate-900 flex justify-center"><img src="${item.image}" class="max-h-36 object-contain"></div>` : ''}
+          <div class="flex justify-end pt-1">
+            <button onclick="openReplyModalForId('${item.id}', '${item.senderName}')" class="text-[11px] text-purple-300 hover:text-purple-200 font-medium flex items-center space-x-1 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-lg">
+              <i class="fa-solid fa-reply text-[9px]"></i>
+              <span>声で返信する</span>
+            </button>
+          </div>
+          ${replyHtml}
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    function playHistoryAudio(path) {
+      if (!path) return alert("再生できる音声データがありません");
+      playAudio(false, path);
+    }
+
+    // --- 返信（ボイスレスポンス）機能 ---
+
+    let replyTargetCapsuleId = null;
+
+    function openReplyModal() {
+      if (currentActiveCapsule) {
+        replyTargetCapsuleId = currentActiveCapsule.id;
+        document.getElementById('reply-target-name').innerText = currentActiveCapsule.senderName;
+      }
+      document.getElementById('reply-modal').classList.remove('hidden');
+    }
+
+    function openReplyModalForId(capsuleId, senderName) {
+      replyTargetCapsuleId = capsuleId;
+      document.getElementById('reply-target-name').innerText = senderName;
+      document.getElementById('reply-modal').classList.remove('hidden');
+    }
+
+    function closeReplyModal() {
+      document.getElementById('reply-modal').classList.add('hidden');
+    }
+
+    function toggleReplyRecording() {
+      const micBtn = document.getElementById('reply-mic-btn');
+      const micIcon = document.getElementById('reply-mic-icon');
+      const status = document.getElementById('reply-status');
+      const timerText = document.getElementById('reply-timer');
+
+      if (!isReplyRecording) {
+        isReplyRecording = true;
+        micBtn.className = "w-16 h-16 mx-auto rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-2xl shadow-lg active:scale-95 transition-all animate-pulse";
+        micIcon.className = "fa-solid fa-square";
+        status.innerText = "返信録音中... タップで停止";
+
+        replySeconds = 0;
+        clearInterval(replyTimer);
+        replyTimer = setInterval(() => {
+          replySeconds++;
+          const m = String(Math.floor(replySeconds / 60)).padStart(2, '0');
+          const s = String(replySeconds % 60).padStart(2, '0');
+          timerText.innerText = `${m}:${s}`;
+        }, 1000);
+      } else {
+        isReplyRecording = false;
+        clearInterval(replyTimer);
+        micBtn.className = "w-16 h-16 mx-auto rounded-full bg-purple-600 text-white flex items-center justify-center text-2xl shadow-lg active:scale-95";
+        micIcon.className = "fa-solid fa-microphone";
+        status.innerText = "返信録音完了！";
+
+        const btn = document.getElementById('send-reply-btn');
+        btn.disabled = false;
+        btn.className = "w-full py-3 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl flex items-center justify-center space-x-1.5 transition-all shadow-md cursor-pointer";
+      }
+    }
+
+    function sendVoiceReply() {
+      alert("返信ボイスを保存・送信しました！");
+      
+      const target = capsuleHistory.find(item => item.id === replyTargetCapsuleId);
+      if (target) {
+        if (!target.replies) target.replies = [];
+        target.replies.push({
+          audio: audioFilePath,
+          date: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+        });
+        localStorage.setItem('ourie_capsules', JSON.stringify(capsuleHistory));
+        renderHistory();
+      }
+
+      closeReplyModal();
+      closeIncomingModal();
     }
   </script>
 </body>
