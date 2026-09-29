@@ -269,7 +269,7 @@
       document.getElementById('avatar-input').click();
     }
 
-    // 画像選択完了後の処理（画像反映 ＋ 基本名前の変更プロンプト）
+    // 画像選択完了後の処理
     function handleAvatarChange(event) {
       const file = event.target.files[0];
       if (file) {
@@ -283,7 +283,6 @@
         reader.readAsDataURL(file);
       }
 
-      // 名前入力ダイアログ
       setTimeout(() => {
         const newName = prompt("基本の表示名（マイプロフィール）を入力してください:", masterMyName);
         if (newName && newName.trim() !== "") {
@@ -297,7 +296,6 @@
       }, 300);
     }
 
-    // 「友達へ届ける」時だけの個別名前変更機能
     function editCustomSenderName() {
       const current = customSenderName || masterMyName;
       const input = prompt("この送信で表示する名前を入力してください（空欄で基本名に戻る）:", current);
@@ -308,7 +306,6 @@
       }
     }
 
-    // 「未来の自分へ」 / 「友達へ届ける」の切り替え処理
     function selectTarget(mode) {
       targetMode = mode;
       const selfBtn = document.getElementById('target-self-btn');
@@ -318,19 +315,16 @@
       if (mode === 'self') {
         selfBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
         friendBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
-        
         if (friendSelectArea) friendSelectArea.classList.add('hidden');
       } else {
         friendBtn.className = "py-2.5 px-3 rounded-xl bg-purple-600 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-md transition-all";
         selfBtn.className = "py-2.5 px-3 rounded-xl bg-slate-800/80 text-slate-400 font-medium text-xs flex items-center justify-center space-x-2 transition-all";
-        
         if (friendSelectArea) friendSelectArea.classList.remove('hidden');
       }
 
       syncProfileName();
     }
 
-    // 左上の名前と送信者カードの完全連動ロジック
     function syncProfileName() {
       const pName = document.getElementById('profile-name');
       const pRole = document.getElementById('profile-role');
@@ -345,34 +339,27 @@
       } else {
         const displayName = customSenderName ? customSenderName : masterMyName;
         pName.innerText = displayName;
-        
         if (pRole) pRole.innerText = customSenderName ? "送信者（変更した名前）" : "送信者（マイプロフィール）";
         if (customBtn) customBtn.classList.remove('hidden');
       }
     }
 
-    // 友達リストプルダウンから選択された時
     function onFriendSelected(userId) {
       if (!userId) return;
       const select = document.getElementById('friend-list-select');
       const selectedOption = select.options[select.selectedIndex];
-      
       const name = selectedOption.getAttribute('data-name');
       const avatar = selectedOption.getAttribute('data-avatar') || 'icon.png';
-
       setRecipientInfo(userId, name, avatar);
     }
 
-    // ID指定検索処理
     function searchFriendByID() {
       const inputId = document.getElementById('friend-id-input').value.trim();
       if (!inputId) return alert("ユーザーIDを入力してください");
-
       setRecipientInfo(inputId, "検索ユーザー (" + inputId + ")", "icon.png");
       alert("ID: " + inputId + " のユーザーをお届け先に設定しました");
     }
 
-    // お届け先ユーザー情報の画面反映
     function setRecipientInfo(id, name, avatar) {
       const rName = document.getElementById('recipient-name');
       const rId = document.getElementById('recipient-id-tag');
@@ -493,7 +480,6 @@
       reader.readAsDataURL(file);
     }
 
-    // 添付画像の削除処理
     function removeAttachedImage() {
       attachedImageBase64 = "";
       const input = document.getElementById('message-image-input');
@@ -505,7 +491,7 @@
       if (container) container.classList.add('hidden');
     }
 
-    // 通話受話（応答ボタンを押した瞬間：通話中UIへ移行）
+    // 通話受話（応答ボタンを押した瞬間：通話中UIへ移行 ＋ 音声再生＆写真表示予約）
     function acceptCall() {
       const actions = document.getElementById('incoming-actions');
       const inCallActions = document.getElementById('in-call-actions');
@@ -533,11 +519,16 @@
       const imageContainer = document.getElementById('incoming-attached-image-container');
       if (imageContainer) imageContainer.classList.add('hidden');
 
-      // 受話器再生開始＆音声終了時の写真開禁フラグをオン
-      playAudio(false, true);
+      // ★ 音声を再生しつつ、音声の長さ（録音秒数recSeconds）に合わせて写真を確実に解禁するロジック
+      playAudio(false);
+
+      // 録音データがある場合は録音秒数後、ないテスト時は3秒後に確実に写真を表示
+      const delayMs = (recSeconds > 0) ? (recSeconds * 1000) : 3000;
+      setTimeout(() => {
+        showAttachedImageAfterAudio();
+      }, delayMs);
     }
 
-    // 通話終了・着信拒否時
     function declineCall() {
       clearInterval(callTimerInterval);
 
@@ -560,8 +551,7 @@
       }
     }
 
-    // 音声再生処理（再生終了検知機能つき）
-    function playAudio(forceSpeaker, onEndedShowImage = false) {
+    function playAudio(forceSpeaker) {
       if (nativePlayer) { 
         try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} 
       }
@@ -576,29 +566,14 @@
           audioFilePath,
           () => {
             if (toggle && typeof toggle.setAudioMode === 'function') toggle.setAudioMode("speaker");
-            if (onEndedShowImage) {
-              showAttachedImageAfterAudio();
-            }
           },
-          (err) => console.error(err),
-          (status) => {
-            if (status === 4 && onEndedShowImage) {
-              showAttachedImageAfterAudio();
-            }
-          }
+          (err) => console.error(err)
         );
         nativePlayer.play();
-      } else {
-        // PCブラウザ等のテスト環境（Mediaプラグインなし）：3秒後に自動で写真解禁
-        if (onEndedShowImage) {
-          setTimeout(() => {
-            showAttachedImageAfterAudio();
-          }, 3000);
-        }
       }
     }
 
-    // 音声終了後に添付写真を解禁表示する処理
+    // 添付写真を解禁表示する処理
     function showAttachedImageAfterAudio() {
       if (attachedImageBase64 && attachedImageBase64 !== "") {
         const img = document.getElementById('incoming-attached-image');
