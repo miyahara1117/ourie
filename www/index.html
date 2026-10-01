@@ -53,7 +53,7 @@
         </button>
       </div>
 
-      <!-- 送信者プロフィールカード (短縮形式 @ou_XXXXX の ID 表示 ＆ コピー機能) -->
+      <!-- 送信者プロフィールカード -->
       <div id="self-profile-card" class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between transition-all">
         <div class="flex items-center space-x-3 flex-1">
           <img id="profile-avatar" src="icon.png" class="w-10 h-10 rounded-full object-cover border border-purple-500/30">
@@ -75,22 +75,23 @@
         </button>
       </div>
 
+      <!-- 友達指定エリア（プルダウン ＋ ID直接追加の両対応） -->
       <div id="friend-select-area" class="hidden space-y-2.5 pt-1 border-t border-slate-800/80">
-        <div>
+        <!-- プルダウン選択（交換済みの友達） -->
+        <div id="friend-dropdown-container">
           <label class="text-[10px] text-slate-400 font-medium mb-1 block">交換済みの友達から選ぶ</label>
           <select id="friend-list-select" onchange="onFriendSelected(this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
             <option value="">-- 友達を選択してください --</option>
-            <option value="user_001" data-name="アリス" data-avatar="icon.png">アリス (ID: @ou_user1)</option>
-            <option value="user_002" data-name="ボブ" data-avatar="icon.png">ボブ (ID: @ou_user2)</option>
           </select>
         </div>
 
+        <!-- ID直接入力・新規追加 -->
         <div>
-          <label class="text-[10px] text-slate-400 font-medium mb-1 block">または Ourie ID で直接指定</label>
+          <label class="text-[10px] text-slate-400 font-medium mb-1 block">新しい Ourie ID を追加して指定</label>
           <div class="flex space-x-2">
             <input type="text" id="friend-id-input" placeholder="例: @ou_x9a2f" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
-            <button type="button" onclick="searchFriendByID()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-xl text-purple-300 border border-slate-700/50">
-              検索
+            <button type="button" onclick="searchFriendByID()" class="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-xs font-medium rounded-xl text-white shadow-sm transition-all">
+              設定
             </button>
           </div>
         </div>
@@ -200,7 +201,7 @@
     </div>
   </main>
 
-  <!-- PAGE 2: 届いたタイムカプセル一覧（専用ページ） -->
+  <!-- PAGE 2: 届いたタイムカプセル一覧 -->
   <main id="page-history" class="hidden flex-1 max-w-md w-full mx-auto px-4 py-5 space-y-4">
     <div class="flex items-center justify-between mb-2">
       <h2 class="text-sm font-bold text-slate-200 flex items-center space-x-2">
@@ -356,9 +357,13 @@
     let callSeconds = 0;
     let imageAlreadyShown = false;
 
+    let recipientUserId = "";
+    let recipientUserName = "";
+
     let currentActiveCapsule = null;
     let selectedDetailCapsule = null;
     let capsuleHistory = [];
+    let friendList = []; // 保存済みの友達リスト
 
     let isReplyRecording = false;
     let replyTimer = null;
@@ -369,8 +374,8 @@
       initMyOurieID();
       syncProfileName();
       loadHistoryFromStorage();
+      loadFriendsFromStorage();
 
-      // Capacitor ローカル通知初期化
       if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
         const { LocalNotifications } = window.Capacitor.Plugins;
         try {
@@ -382,10 +387,8 @@
       }
     });
 
-    // 自分の Ourie ID を初期化・保存（@ou_XXXXX 形式）
     function initMyOurieID() {
       let savedID = localStorage.getItem('my_ourie_id');
-      // 旧 @ourie_ 形式、または未設定の場合は新形式 @ou_ で自動更新・作成
       if (!savedID || savedID.startsWith('@ourie_')) {
         const randomHex = Math.random().toString(36).substring(2, 7);
         savedID = `@ou_${randomHex}`;
@@ -396,13 +399,48 @@
       if (displayElem) displayElem.innerText = myOurieID;
     }
 
-    // 自分のOurie IDをクリップボードにコピー
     function copyMyID() {
       navigator.clipboard.writeText(myOurieID).then(() => {
         alert(`あなたの Ourie ID (${myOurieID}) をコピーしました！友達に共有してください。`);
       }).catch(() => {
         alert(`あなたの Ourie ID は [ ${myOurieID} ] です。`);
       });
+    }
+
+    // 友達リストのロード＆プルダウン生成
+    function loadFriendsFromStorage() {
+      const saved = localStorage.getItem('ourie_friends');
+      if (saved) {
+        try { friendList = JSON.parse(saved); } catch(e) {}
+      }
+      renderFriendDropdown();
+    }
+
+    function renderFriendDropdown() {
+      const select = document.getElementById('friend-list-select');
+      if (!select) return;
+
+      select.innerHTML = '<option value="">-- 友達を選択してください --</option>';
+      friendList.forEach(friend => {
+        const opt = document.createElement('option');
+        opt.value = friend.id;
+        opt.setAttribute('data-name', friend.name);
+        opt.setAttribute('data-avatar', friend.avatar || 'icon.png');
+        opt.innerText = `${friend.name} (ID: ${friend.id})`;
+        select.appendChild(opt);
+      });
+    }
+
+    // 友達を追加・更新して保存する関数
+    function saveFriendToList(id, name, avatar = 'icon.png') {
+      const existingIdx = friendList.findIndex(f => f.id === id);
+      if (existingIdx >= 0) {
+        friendList[existingIdx].name = name;
+      } else {
+        friendList.push({ id, name, avatar });
+      }
+      localStorage.setItem('ourie_friends', JSON.stringify(friendList));
+      renderFriendDropdown();
     }
 
     function switchPage(page) {
@@ -508,14 +546,29 @@
       setRecipientInfo(userId, name, avatar);
     }
 
+    // ID指定での検索・友達リスト登録処理
     function searchFriendByID() {
       const inputId = document.getElementById('friend-id-input').value.trim();
-      if (!inputId) return alert("ユーザーIDを入力してください");
-      setRecipientInfo(inputId, "検索ユーザー (" + inputId + ")", "icon.png");
-      alert("ID: " + inputId + " のユーザーをお届け先に設定しました");
+      if (!inputId) return alert("Ourie IDを入力してください");
+
+      const formattedID = inputId.startsWith('@') ? inputId : `@${inputId}`;
+      const defaultName = `ユーザー (${formattedID})`;
+
+      // 友達リストに自動登録・保存
+      saveFriendToList(formattedID, defaultName);
+      setRecipientInfo(formattedID, defaultName, "icon.png");
+
+      // プルダウンでも選択状態にする
+      const select = document.getElementById('friend-list-select');
+      if (select) select.value = formattedID;
+
+      alert(`送信先に Ourie ID: ${formattedID} を設定＆友達リストに保存しました！`);
     }
 
     function setRecipientInfo(id, name, avatar) {
+      recipientUserId = id;
+      recipientUserName = name;
+
       const rName = document.getElementById('recipient-name');
       const rId = document.getElementById('recipient-id-tag');
       const rAvatar = document.getElementById('recipient-avatar');
@@ -623,6 +676,10 @@
       const inputVal = document.getElementById('target-time-input').value;
       if (!inputVal) return alert("お届け日時を選択してください");
 
+      if (targetMode === 'friend' && !recipientUserId) {
+        return alert("お届け先の Ourie ID を設定してください");
+      }
+
       const targetTime = new Date(inputVal).getTime();
       const delay = targetTime - Date.now();
 
@@ -658,7 +715,7 @@
         } catch(e) { console.error(e); }
       }
 
-      alert(`タイムカプセルを予約しました！ (あなたのID: ${myOurieID})`);
+      alert(`タイムカプセルを予約しました！`);
 
       setTimeout(() => {
         triggerIncomingCall();
