@@ -6,6 +6,12 @@
   <title>Ourie TIME CAPSULE</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Firebase SDK (v9 Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+
   <style>
     body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   </style>
@@ -75,9 +81,8 @@
         </button>
       </div>
 
-      <!-- 友達指定エリア（プルダウン ＋ ID直接追加の両対応） -->
+      <!-- 友達指定エリア -->
       <div id="friend-select-area" class="hidden space-y-2.5 pt-1 border-t border-slate-800/80">
-        <!-- プルダウン選択（交換済みの友達） -->
         <div id="friend-dropdown-container">
           <label class="text-[10px] text-slate-400 font-medium mb-1 block">交換済みの友達から選ぶ</label>
           <select id="friend-list-select" onchange="onFriendSelected(this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
@@ -85,7 +90,6 @@
           </select>
         </div>
 
-        <!-- ID直接入力・新規追加 -->
         <div>
           <label class="text-[10px] text-slate-400 font-medium mb-1 block">新しい Ourie ID を追加して指定</label>
           <div class="flex space-x-2">
@@ -196,7 +200,7 @@
     <div class="pt-2">
       <button id="submit-btn" onclick="scheduleCapsule()" disabled type="button" class="w-full py-4 bg-slate-800 text-slate-500 font-bold text-sm rounded-xl flex items-center justify-center space-x-2 transition-all cursor-not-allowed shadow-md">
         <i class="fa-solid fa-paper-plane"></i>
-        <span>未来の自分へタイムカプセルを予約する</span>
+        <span>タイムカプセルを送信・予約する</span>
       </button>
     </div>
   </main>
@@ -341,6 +345,22 @@
   </div>
 
   <script>
+    // --- Firebase 初期設定 (google-services.json 等の設定) ---
+    // ※ プロジェクトの設定情報をここに初期化
+    if (!firebase.apps.length) {
+      const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "ourie-app.firebaseapp.com",
+        projectId: "ourie-app",
+        storageBucket: "ourie-app.appspot.com",
+        messagingSenderId: "123456789",
+        appId: "com.ourie.timecapsule"
+      };
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
     let isRecording = false;
     let recTimer = null;
     let recSeconds = 0;
@@ -363,7 +383,7 @@
     let currentActiveCapsule = null;
     let selectedDetailCapsule = null;
     let capsuleHistory = [];
-    let friendList = []; // 保存済みの友達リスト
+    let friendList = [];
 
     let isReplyRecording = false;
     let replyTimer = null;
@@ -376,6 +396,10 @@
       loadHistoryFromStorage();
       loadFriendsFromStorage();
 
+      // リアルタイム受信監視を開始（自分宛ての新規カプセルを検知）
+      listenForIncomingCapsules();
+
+      // Capacitor ローカル通知初期化
       if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
         const { LocalNotifications } = window.Capacitor.Plugins;
         try {
@@ -407,7 +431,6 @@
       });
     }
 
-    // 友達リストのロード＆プルダウン生成
     function loadFriendsFromStorage() {
       const saved = localStorage.getItem('ourie_friends');
       if (saved) {
@@ -431,7 +454,6 @@
       });
     }
 
-    // 友達を追加・更新して保存する関数
     function saveFriendToList(id, name, avatar = 'icon.png') {
       const existingIdx = friendList.findIndex(f => f.id === id);
       if (existingIdx >= 0) {
@@ -546,7 +568,6 @@
       setRecipientInfo(userId, name, avatar);
     }
 
-    // ID指定での検索・友達リスト登録処理
     function searchFriendByID() {
       const inputId = document.getElementById('friend-id-input').value.trim();
       if (!inputId) return alert("Ourie IDを入力してください");
@@ -554,11 +575,9 @@
       const formattedID = inputId.startsWith('@') ? inputId : `@${inputId}`;
       const defaultName = `ユーザー (${formattedID})`;
 
-      // 友達リストに自動登録・保存
       saveFriendToList(formattedID, defaultName);
       setRecipientInfo(formattedID, defaultName, "icon.png");
 
-      // プルダウンでも選択状態にする
       const select = document.getElementById('friend-list-select');
       if (select) select.value = formattedID;
 
@@ -672,11 +691,13 @@
       if (container) container.classList.add('hidden');
     }
 
+    // --- Firebase 連携送信処理 ---
     async function scheduleCapsule() {
       const inputVal = document.getElementById('target-time-input').value;
       if (!inputVal) return alert("お届け日時を選択してください");
 
-      if (targetMode === 'friend' && !recipientUserId) {
+      const targetRecipientID = (targetMode === 'friend') ? recipientUserId : myOurieID;
+      if (targetMode === 'friend' && !targetRecipientID) {
         return alert("お届け先の Ourie ID を設定してください");
       }
 
@@ -690,18 +711,32 @@
         displayName = customSenderName ? customSenderName : masterMyName;
       }
 
-      currentActiveCapsule = {
+      const capsuleData = {
         id: "capsule_" + Date.now(),
+        senderID: myOurieID,
         senderName: displayName,
+        recipientID: targetRecipientID,
+        targetTime: targetTime,
         audioPath: audioFilePath,
         image: attachedImageBase64,
         date: new Date().toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-        replies: []
+        replies: [],
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
       };
 
-      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
-        const { LocalNotifications } = window.Capacitor.Plugins;
-        try {
+      try {
+        // 自分宛てテスト時はローカルに即時保存＆タイマーセット
+        if (targetRecipientID === myOurieID) {
+          currentActiveCapsule = capsuleData;
+          setTimeout(() => { triggerIncomingCall(); }, delay);
+        } else {
+          // Firebase Firestore に送信保存（相手の端末がリアルタイム受信）
+          await db.collection('capsules').add(capsuleData);
+        }
+
+        // Capacitor ローカル通知登録
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+          const { LocalNotifications } = window.Capacitor.Plugins;
           await LocalNotifications.schedule({
             notifications: [
               {
@@ -712,14 +747,41 @@
               }
             ]
           });
-        } catch(e) { console.error(e); }
+        }
+
+        alert(`タイムカプセルを送信・予約しました！ (送信先: ${targetRecipientID})`);
+      } catch (err) {
+        console.error("送信エラー:", err);
+        alert("送信処理で一時的なエラーが発生しました: " + err.message);
       }
+    }
 
-      alert(`タイムカプセルを予約しました！`);
+    // --- リアルタイム受信監視処理 ---
+    function listenForIncomingCapsules() {
+      if (!db || !myOurieID) return;
 
-      setTimeout(() => {
-        triggerIncomingCall();
-      }, delay);
+      db.collection('capsules')
+        .where('recipientID', '==', myOurieID)
+        .onSnapshot((snapshot) => {
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              const data = change.doc.data();
+              const delay = data.targetTime - Date.now();
+
+              // 指定時間に合わせて着信予約をセット
+              if (delay > 0) {
+                setTimeout(() => {
+                  currentActiveCapsule = data;
+                  triggerIncomingCall();
+                }, delay);
+              } else {
+                // すでにお届け時間を過ぎている場合は即時着信画面
+                currentActiveCapsule = data;
+                triggerIncomingCall();
+              }
+            }
+          });
+        });
     }
 
     function triggerIncomingCall() {
