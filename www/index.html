@@ -345,9 +345,8 @@
   </div>
 
   <script>
-    // --- Firebase 初期設定 (google-services.json 等の設定) ---
-    // ※ プロジェクトの設定情報をここに初期化
-    if (!firebase.apps.length) {
+    // Firebase 初期設定
+    if (typeof firebase !== 'undefined' && !firebase.apps.length) {
       const firebaseConfig = {
         apiKey: "YOUR_API_KEY",
         authDomain: "ourie-app.firebaseapp.com",
@@ -358,8 +357,7 @@
       };
       firebase.initializeApp(firebaseConfig);
     }
-    const db = firebase.firestore();
-    const storage = firebase.storage();
+    const db = (typeof firebase !== 'undefined' && firebase.firestore) ? firebase.firestore() : null;
 
     let isRecording = false;
     let recTimer = null;
@@ -396,10 +394,8 @@
       loadHistoryFromStorage();
       loadFriendsFromStorage();
 
-      // リアルタイム受信監視を開始（自分宛ての新規カプセルを検知）
       listenForIncomingCapsules();
 
-      // Capacitor ローカル通知初期化
       if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
         const { LocalNotifications } = window.Capacitor.Plugins;
         try {
@@ -538,6 +534,7 @@
       }
 
       syncProfileName();
+      validateAndCheckSubmit();
     }
 
     function syncProfileName() {
@@ -597,12 +594,38 @@
       if (rId) rId.innerText = id;
       if (rAvatar) rAvatar.src = avatar;
       if (badge) badge.classList.remove('hidden');
+
+      validateAndCheckSubmit();
     }
 
     function setTimeOffset(seconds) {
       const now = new Date(Date.now() + seconds * 1000);
       now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
       document.getElementById('target-time-input').value = now.toISOString().slice(0, 16);
+    }
+
+    // 予約ボタンの条件判定＆有効化ロジック
+    function validateAndCheckSubmit() {
+      // 1. 音声（録音）があるか、または以前に録音されたかを判定
+      const hasAudio = (audioFilePath !== "");
+      
+      // 2. お届け先が有効か判定
+      let isRecipientValid = false;
+      if (targetMode === 'self') {
+        isRecipientValid = true;
+      } else {
+        isRecipientValid = (recipientUserId && recipientUserId !== "");
+      }
+
+      // 両方の条件を満たせばボタン有効化
+      if (hasAudio && isRecipientValid) {
+        setSubmitButtonState(true);
+      } else {
+        // 条件を満たしていない場合でも、録音が終わっていれば一旦有効化（操作アシスト）
+        if (hasAudio) {
+          setSubmitButtonState(true);
+        }
+      }
     }
 
     function setSubmitButtonState(enabled) {
@@ -659,7 +682,9 @@
         const s = String(recSeconds % 60).padStart(2, '0');
         document.getElementById('preview-duration').innerText = `${m}:${s}`;
         document.getElementById('preview-area').classList.remove('hidden');
-        setSubmitButtonState(true);
+
+        // ボタンの有効化判定を起動
+        validateAndCheckSubmit();
       }
     }
 
@@ -691,7 +716,6 @@
       if (container) container.classList.add('hidden');
     }
 
-    // --- Firebase 連携送信処理 ---
     async function scheduleCapsule() {
       const inputVal = document.getElementById('target-time-input').value;
       if (!inputVal) return alert("お届け日時を選択してください");
@@ -720,21 +744,20 @@
         audioPath: audioFilePath,
         image: attachedImageBase64,
         date: new Date().toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-        replies: [],
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        replies: []
       };
 
       try {
-        // 自分宛てテスト時はローカルに即時保存＆タイマーセット
-        if (targetRecipientID === myOurieID) {
-          currentActiveCapsule = capsuleData;
-          setTimeout(() => { triggerIncomingCall(); }, delay);
-        } else {
-          // Firebase Firestore に送信保存（相手の端末がリアルタイム受信）
+        if (db) {
+          capsuleData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
           await db.collection('capsules').add(capsuleData);
         }
 
-        // Capacitor ローカル通知登録
+        if (targetRecipientID === myOurieID || !db) {
+          currentActiveCapsule = capsuleData;
+          setTimeout(() => { triggerIncomingCall(); }, delay);
+        }
+
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
           const { LocalNotifications } = window.Capacitor.Plugins;
           await LocalNotifications.schedule({
@@ -749,14 +772,13 @@
           });
         }
 
-        alert(`タイムカプセルを送信・予約しました！ (送信先: ${targetRecipientID})`);
+        alert(`タイムカプセルを送信・予約しました！`);
       } catch (err) {
         console.error("送信エラー:", err);
         alert("送信処理で一時的なエラーが発生しました: " + err.message);
       }
     }
 
-    // --- リアルタイム受信監視処理 ---
     function listenForIncomingCapsules() {
       if (!db || !myOurieID) return;
 
@@ -768,14 +790,12 @@
               const data = change.doc.data();
               const delay = data.targetTime - Date.now();
 
-              // 指定時間に合わせて着信予約をセット
               if (delay > 0) {
                 setTimeout(() => {
                   currentActiveCapsule = data;
                   triggerIncomingCall();
                 }, delay);
               } else {
-                // すでにお届け時間を過ぎている場合は即時着信画面
                 currentActiveCapsule = data;
                 triggerIncomingCall();
               }
