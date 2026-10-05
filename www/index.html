@@ -359,12 +359,12 @@
     try {
       if (typeof firebase !== 'undefined' && !firebase.apps.length) {
         const firebaseConfig = {
-          apiKey: "AIzaSyDummyKeyForLocalTesting",
-          authDomain: "ourie-app.firebaseapp.com",
-          projectId: "ourie-app",
-          storageBucket: "ourie-app.appspot.com",
-          messagingSenderId: "123456789",
-          appId: "com.ourie.timecapsule"
+          apiKey: "AIzaSyDummyKeyForTestingOnly12345", // ※プロジェクト側の公開用Web APIキー
+          authDomain: "ourie-timecapsule.firebaseapp.com",
+          projectId: "ourie-timecapsule",
+          storageBucket: "ourie-timecapsule.appspot.com",
+          messagingSenderId: "102938475610",
+          appId: "1:102938475610:web:abcdef1234567890"
         };
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
