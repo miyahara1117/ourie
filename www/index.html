@@ -349,8 +349,9 @@
     let db = null;
     try {
       if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+        // ※ 本番のFirebase連携時はここにコンソールからの記述を反映します
         const firebaseConfig = {
-          apiKey: "YOUR_API_KEY",
+          apiKey: "AIzaSyDummyKeyForLocalTesting",
           authDomain: "ourie-app.firebaseapp.com",
           projectId: "ourie-app",
           storageBucket: "ourie-app.appspot.com",
@@ -361,7 +362,7 @@
         db = firebase.firestore();
       }
     } catch(e) {
-      console.log("Firebase initialized in fallback mode");
+      console.log("Firebase fallback mode");
     }
 
     let isRecording = false;
@@ -609,15 +610,10 @@
       document.getElementById('target-time-input').value = now.toISOString().slice(0, 16);
     }
 
-    // 送信予約ボタンの有効化チェック
+    // 送信予約ボタンの有効化チェック（録音済み、またはお届け先が確定していれば有効化）
     function validateAndCheckSubmit() {
       const hasAudio = (audioFilePath !== "" || isRecording);
-      let isRecipientValid = false;
-      if (targetMode === 'self') {
-        isRecipientValid = true;
-      } else {
-        isRecipientValid = (recipientUserId && recipientUserId !== "");
-      }
+      let isRecipientValid = (targetMode === 'self') ? true : (recipientUserId && recipientUserId !== "");
 
       if (hasAudio || isRecipientValid) {
         setSubmitButtonState(true);
@@ -711,73 +707,85 @@
       if (container) container.classList.add('hidden');
     }
 
-    // 送信予約メイン処理（100%着信保証）
-    async function scheduleCapsule() {
-      const inputVal = document.getElementById('target-time-input').value;
-      if (!inputVal) return alert("お届け日時を選択してください");
-
-      const targetRecipientID = (targetMode === 'friend') ? recipientUserId : myOurieID;
-      if (targetMode === 'friend' && !targetRecipientID) {
-        return alert("お届け先の Ourie ID を設定してください");
-      }
-
-      const targetTime = new Date(inputVal).getTime();
-      const delay = targetTime - Date.now();
-
-      if (delay <= 0) return alert("未来の日時を選択してください");
-
-      let displayName = "過去の自分";
-      if (targetMode === 'friend') {
-        displayName = customSenderName ? customSenderName : masterMyName;
-      }
-
-      currentActiveCapsule = {
-        id: "capsule_" + Date.now(),
-        senderID: myOurieID,
-        senderName: displayName,
-        recipientID: targetRecipientID,
-        targetTime: targetTime,
-        audioPath: audioFilePath,
-        image: attachedImageBase64,
-        date: new Date().toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-        replies: []
-      };
-
-      // Firebase Firestore 送信（エラーが起きてもローカルタイマーは必ず続行）
+    // 送信予約処理（完全安全実行型）
+    function scheduleCapsule() {
       try {
-        if (db) {
-          await db.collection('capsules').add({
-            ...currentActiveCapsule,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
+        const inputVal = document.getElementById('target-time-input').value;
+        if (!inputVal) {
+          alert("お届け日時を選択してください");
+          return;
         }
+
+        const targetRecipientID = (targetMode === 'friend') ? recipientUserId : myOurieID;
+        if (targetMode === 'friend' && !targetRecipientID) {
+          alert("お届け先の Ourie ID を設定してください");
+          return;
+        }
+
+        const targetTime = new Date(inputVal).getTime();
+        const delay = targetTime - Date.now();
+
+        if (delay <= 0) {
+          alert("未来の日時を選択してください");
+          return;
+        }
+
+        let displayName = "過去の自分";
+        if (targetMode === 'friend') {
+          displayName = customSenderName ? customSenderName : masterMyName;
+        }
+
+        currentActiveCapsule = {
+          id: "capsule_" + Date.now(),
+          senderID: myOurieID,
+          senderName: displayName,
+          recipientID: targetRecipientID,
+          targetTime: targetTime,
+          audioPath: audioFilePath,
+          image: attachedImageBase64,
+          date: new Date().toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          replies: []
+        };
+
+        // Firebase 通信（成功時もエラー時も止めない）
+        if (db) {
+          try {
+            db.collection('capsules').add({
+              ...currentActiveCapsule,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+          } catch(e) { console.log("Firebase sync skipped"); }
+        }
+
+        // OSローカル通知登録
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+          const { LocalNotifications } = window.Capacitor.Plugins;
+          try {
+            LocalNotifications.schedule({
+              notifications: [
+                {
+                  title: "タイムカプセルが届きました",
+                  body: `${displayName} から着信メッセージがあります`,
+                  id: Math.floor(Math.random() * 100000),
+                  schedule: { at: new Date(targetTime) }
+                }
+              ]
+            });
+          } catch(e) {}
+        }
+
+        // 成功ダイアログを表示
+        alert(`タイムカプセルを予約・送信しました！ (送信先: ${targetRecipientID})`);
+
+        // 指定時間後に確実に着信モーダルを起動
+        setTimeout(() => {
+          triggerIncomingCall();
+        }, delay);
+
       } catch (err) {
-        console.log("Firebase sync fallback");
+        console.error("Critical Schedule Error:", err);
+        alert("予約処理中にエラーが発生しました: " + err.message);
       }
-
-      // 端末ローカル通知予約
-      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
-        const { LocalNotifications } = window.Capacitor.Plugins;
-        try {
-          await LocalNotifications.schedule({
-            notifications: [
-              {
-                title: "タイムカプセルが届きました",
-                body: `${displayName} から着信メッセージがあります`,
-                id: Math.floor(Math.random() * 100000),
-                schedule: { at: new Date(targetTime) }
-              }
-            ]
-          });
-        } catch(e) {}
-      }
-
-      alert("タイムカプセルを予約・送信しました！指定時間に着信します。");
-
-      // 確実に着信画面を呼び出すローカルタイマー
-      setTimeout(() => {
-        triggerIncomingCall();
-      }, delay);
     }
 
     function listenForIncomingCapsules() {
