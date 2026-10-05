@@ -81,13 +81,19 @@
         </button>
       </div>
 
-      <!-- 友達指定エリア -->
+      <!-- 友達指定エリア（削除ボタン付き） -->
       <div id="friend-select-area" class="hidden space-y-2.5 pt-1 border-t border-slate-800/80">
         <div id="friend-dropdown-container">
           <label class="text-[10px] text-slate-400 font-medium mb-1 block">交換済みの友達から選ぶ</label>
-          <select id="friend-list-select" onchange="onFriendSelected(this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
-            <option value="">-- 友達を選択してください --</option>
-          </select>
+          <div class="flex space-x-2">
+            <select id="friend-list-select" onchange="onFriendSelected(this.value)" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+              <option value="">-- 友達を選択してください --</option>
+            </select>
+            <button id="delete-friend-btn" type="button" onclick="deleteSelectedFriend()" class="hidden px-3 py-2 bg-red-950/60 hover:bg-red-900/80 text-red-400 border border-red-500/30 text-xs font-medium rounded-xl transition-all flex items-center space-x-1">
+              <i class="fa-solid fa-trash-can text-[10px]"></i>
+              <span>削除</span>
+            </button>
+          </div>
         </div>
 
         <div>
@@ -435,18 +441,24 @@
       });
     }
 
-    // 友達リストの取得＆クリーン表示
+    // 友達リストの取得＆重複・古い表記クリーンアップ
     function loadFriendsFromStorage() {
       const saved = localStorage.getItem('ourie_friends');
       if (saved) {
         try { 
           friendList = JSON.parse(saved);
-          // 過去の古い表記データを自動クリーンアップ
+          
+          // ID重複を除去
+          const uniqueMap = new Map();
           friendList.forEach(f => {
-            if (!f.name || f.name.startsWith('ユーザー (')) {
-              f.name = `友達 (${f.id})`;
+            if (!uniqueMap.has(f.id)) {
+              if (!f.name || f.name.startsWith('ユーザー (')) {
+                f.name = `友達 (${f.id})`;
+              }
+              uniqueMap.set(f.id, f);
             }
           });
+          friendList = Array.from(uniqueMap.values());
           localStorage.setItem('ourie_friends', JSON.stringify(friendList));
         } catch(e) {}
       }
@@ -463,7 +475,6 @@
         opt.value = friend.id;
         opt.setAttribute('data-name', friend.name);
         opt.setAttribute('data-avatar', friend.avatar || 'icon.png');
-        // 表示を「名前 (ID)」のみでスッキリ整える
         opt.innerText = `${friend.name} (${friend.id})`;
         select.appendChild(opt);
       });
@@ -480,7 +491,29 @@
       renderFriendDropdown();
     }
 
-    // 選択中友達の名前変更
+    // 選択された友達の削除機能
+    function deleteSelectedFriend() {
+      if (!recipientUserId) return;
+      const targetObj = friendList.find(f => f.id === recipientUserId);
+      const name = targetObj ? targetObj.name : recipientUserId;
+
+      if (confirm(`「${name}」を友達リストから削除しますか？`)) {
+        friendList = friendList.filter(f => f.id !== recipientUserId);
+        localStorage.setItem('ourie_friends', JSON.stringify(friendList));
+        
+        recipientUserId = "";
+        recipientUserName = "";
+        
+        document.getElementById('friend-list-select').value = "";
+        document.getElementById('selected-recipient-badge').classList.add('hidden');
+        document.getElementById('delete-friend-btn').classList.add('hidden');
+        
+        renderFriendDropdown();
+        alert("友達リストから削除しました。");
+        validateAndCheckSubmit();
+      }
+    }
+
     function renameCurrentFriend() {
       if (!recipientUserId) return;
       const currentObj = friendList.find(f => f.id === recipientUserId);
@@ -591,7 +624,10 @@
     }
 
     function onFriendSelected(userId) {
-      if (!userId) return;
+      if (!userId) {
+        document.getElementById('delete-friend-btn').classList.add('hidden');
+        return;
+      }
       const select = document.getElementById('friend-list-select');
       const selectedOption = select.options[select.selectedIndex];
       const name = selectedOption.getAttribute('data-name');
@@ -599,7 +635,6 @@
       setRecipientInfo(userId, name, avatar);
     }
 
-    // ID追加・設定時に表示名入力ダイアログを起動
     function searchFriendByID() {
       const inputId = document.getElementById('friend-id-input').value.trim();
       if (!inputId) return alert("Ourie IDを入力してください");
@@ -627,11 +662,13 @@
       const rId = document.getElementById('recipient-id-tag');
       const rAvatar = document.getElementById('recipient-avatar');
       const badge = document.getElementById('selected-recipient-badge');
+      const delBtn = document.getElementById('delete-friend-btn');
 
       if (rName) rName.innerText = name;
       if (rId) rId.innerText = id;
       if (rAvatar) rAvatar.src = avatar;
       if (badge) badge.classList.remove('hidden');
+      if (delBtn) delBtn.classList.remove('hidden');
 
       validateAndCheckSubmit();
     }
