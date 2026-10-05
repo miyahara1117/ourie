@@ -108,7 +108,10 @@
               <p id="recipient-name" class="text-xs font-bold text-white">---</p>
             </div>
           </div>
-          <span id="recipient-id-tag" class="text-[10px] font-mono text-purple-400 bg-purple-900/60 px-2 py-0.5 rounded-full">@id</span>
+          <button type="button" onclick="renameCurrentFriend()" class="text-[10px] font-mono text-purple-300 bg-purple-900/60 hover:bg-purple-800 px-2 py-0.5 rounded-full border border-purple-500/30 flex items-center space-x-1">
+            <span id="recipient-id-tag">@id</span>
+            <i class="fa-solid fa-pen text-[8px] ml-1"></i>
+          </button>
         </div>
       </div>
 
@@ -349,7 +352,6 @@
     let db = null;
     try {
       if (typeof firebase !== 'undefined' && !firebase.apps.length) {
-        // ※ 本番のFirebase連携時はここにコンソールからの記述を反映します
         const firebaseConfig = {
           apiKey: "AIzaSyDummyKeyForLocalTesting",
           authDomain: "ourie-app.firebaseapp.com",
@@ -433,10 +435,20 @@
       });
     }
 
+    // 友達リストの取得＆クリーン表示
     function loadFriendsFromStorage() {
       const saved = localStorage.getItem('ourie_friends');
       if (saved) {
-        try { friendList = JSON.parse(saved); } catch(e) {}
+        try { 
+          friendList = JSON.parse(saved);
+          // 過去の古い表記データを自動クリーンアップ
+          friendList.forEach(f => {
+            if (!f.name || f.name.startsWith('ユーザー (')) {
+              f.name = `友達 (${f.id})`;
+            }
+          });
+          localStorage.setItem('ourie_friends', JSON.stringify(friendList));
+        } catch(e) {}
       }
       renderFriendDropdown();
     }
@@ -451,7 +463,8 @@
         opt.value = friend.id;
         opt.setAttribute('data-name', friend.name);
         opt.setAttribute('data-avatar', friend.avatar || 'icon.png');
-        opt.innerText = `${friend.name} (ID: ${friend.id})`;
+        // 表示を「名前 (ID)」のみでスッキリ整える
+        opt.innerText = `${friend.name} (${friend.id})`;
         select.appendChild(opt);
       });
     }
@@ -465,6 +478,21 @@
       }
       localStorage.setItem('ourie_friends', JSON.stringify(friendList));
       renderFriendDropdown();
+    }
+
+    // 選択中友達の名前変更
+    function renameCurrentFriend() {
+      if (!recipientUserId) return;
+      const currentObj = friendList.find(f => f.id === recipientUserId);
+      const currentName = currentObj ? currentObj.name : recipientUserName;
+      
+      const newName = prompt(`「${recipientUserId}」の表示名（ニックネーム）を入力してください:`, currentName);
+      if (newName && newName.trim() !== "") {
+        saveFriendToList(recipientUserId, newName.trim());
+        setRecipientInfo(recipientUserId, newName.trim(), "icon.png");
+        const select = document.getElementById('friend-list-select');
+        if (select) select.value = recipientUserId;
+      }
     }
 
     function switchPage(page) {
@@ -571,20 +599,24 @@
       setRecipientInfo(userId, name, avatar);
     }
 
+    // ID追加・設定時に表示名入力ダイアログを起動
     function searchFriendByID() {
       const inputId = document.getElementById('friend-id-input').value.trim();
       if (!inputId) return alert("Ourie IDを入力してください");
 
       const formattedID = inputId.startsWith('@') ? inputId : `@${inputId}`;
-      const defaultName = `ユーザー (${formattedID})`;
+      const nickname = prompt(`「${formattedID}」の友達の表示名（ニックネーム）を入力してください:`, `友達`);
+      
+      const friendName = (nickname && nickname.trim() !== "") ? nickname.trim() : `友達`;
 
-      saveFriendToList(formattedID, defaultName);
-      setRecipientInfo(formattedID, defaultName, "icon.png");
+      saveFriendToList(formattedID, friendName);
+      setRecipientInfo(formattedID, friendName, "icon.png");
 
       const select = document.getElementById('friend-list-select');
       if (select) select.value = formattedID;
 
-      alert(`送信先に Ourie ID: ${formattedID} を設定＆友達リストに保存しました！`);
+      document.getElementById('friend-id-input').value = "";
+      alert(`「${friendName} (${formattedID})」を送信先に設定＆保存しました！`);
     }
 
     function setRecipientInfo(id, name, avatar) {
@@ -610,7 +642,6 @@
       document.getElementById('target-time-input').value = now.toISOString().slice(0, 16);
     }
 
-    // 送信予約ボタンの有効化チェック（録音済み、またはお届け先が確定していれば有効化）
     function validateAndCheckSubmit() {
       const hasAudio = (audioFilePath !== "" || isRecording);
       let isRecipientValid = (targetMode === 'self') ? true : (recipientUserId && recipientUserId !== "");
@@ -707,7 +738,6 @@
       if (container) container.classList.add('hidden');
     }
 
-    // 送信予約処理（完全安全実行型）
     function scheduleCapsule() {
       try {
         const inputVal = document.getElementById('target-time-input').value;
@@ -747,17 +777,15 @@
           replies: []
         };
 
-        // Firebase 通信（成功時もエラー時も止めない）
         if (db) {
           try {
             db.collection('capsules').add({
               ...currentActiveCapsule,
               createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-          } catch(e) { console.log("Firebase sync skipped"); }
+          } catch(e) {}
         }
 
-        // OSローカル通知登録
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
           const { LocalNotifications } = window.Capacitor.Plugins;
           try {
@@ -774,16 +802,14 @@
           } catch(e) {}
         }
 
-        // 成功ダイアログを表示
-        alert(`タイムカプセルを予約・送信しました！ (送信先: ${targetRecipientID})`);
+        alert(`タイムカプセルを予約・送信しました！ (送信先: ${recipientUserName || targetRecipientID})`);
 
-        // 指定時間後に確実に着信モーダルを起動
         setTimeout(() => {
           triggerIncomingCall();
         }, delay);
 
       } catch (err) {
-        console.error("Critical Schedule Error:", err);
+        console.error("Schedule Error:", err);
         alert("予約処理中にエラーが発生しました: " + err.message);
       }
     }
