@@ -354,7 +354,6 @@
   </div>
 
   <script>
-    // 本物の Firebase 設定を適用
     let db = null;
     try {
       if (typeof firebase !== 'undefined' && !firebase.apps.length) {
@@ -410,8 +409,6 @@
       loadHistoryFromStorage();
       loadFriendsFromStorage();
 
-      listenForIncomingCapsules();
-
       if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
         const { LocalNotifications } = window.Capacitor.Plugins;
         try {
@@ -433,6 +430,8 @@
       myOurieID = savedID;
       const displayElem = document.getElementById('my-ourie-id-display');
       if (displayElem) displayElem.innerText = myOurieID;
+      
+      if (db) listenForIncomingCapsules();
     }
 
     function copyMyID() {
@@ -700,7 +699,6 @@
       }
     }
 
-    // スマホ（ネイティブ）＆ PCブラウザ両対応マイク録音
     async function toggleRecording() {
       const micBtn = document.getElementById('mic-btn');
       const micIcon = document.getElementById('mic-icon');
@@ -789,7 +787,7 @@
       if (container) container.classList.add('hidden');
     }
 
-    // オンライン/ローカル送信切り替え処理
+    // カプセル予約・送信処理（DBフィールド名完全一致版）
     async function scheduleCapsule() {
       try {
         const inputVal = document.getElementById('target-time-input').value;
@@ -810,48 +808,28 @@
           displayName = customSenderName ? customSenderName : masterMyName;
         }
 
-        currentActiveCapsule = {
-          id: "capsule_" + Date.now(),
-          senderID: myOurieID,
+        // Firestore の既存構造 (recipientId, targetTimestamp, audioUrl, photoData 等) に完全統一
+        const capsuleData = {
+          senderId: myOurieID,
           senderName: displayName,
-          recipientID: targetRecipientID,
-          targetTime: targetTime,
-          audioPath: audioFilePath,
-          image: attachedImageBase64,
-          date: new Date().toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-          replies: []
+          senderAvatar: null,
+          recipientId: targetRecipientID,
+          targetTimestamp: targetTime,
+          audioUrl: audioFilePath,
+          photoData: attachedImageBase64,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
-        // Firebase Firestore へ送信保存
         if (db) {
           try {
-            await db.collection('capsules').add({
-              ...currentActiveCapsule,
-              createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            await db.collection('capsules').add(capsuleData);
+            console.log("Firestoreへの保存成功!");
           } catch(e) { console.error("Firestore Save Error:", e); }
         }
 
-        // 自分宛ての場合のみ自分の端末でローカルタイマーを回す
         if (targetRecipientID === myOurieID) {
-          if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
-            const { LocalNotifications } = window.Capacitor.Plugins;
-            try {
-              await LocalNotifications.schedule({
-                notifications: [
-                  {
-                    title: "タイムカプセルが届きました",
-                    body: `${displayName} から着信メッセージがあります`,
-                    id: Math.floor(Math.random() * 100000),
-                    schedule: { at: new Date(targetTime) }
-                  }
-                ]
-              });
-            } catch(e) {}
-          }
-
           setTimeout(() => {
-            triggerIncomingCall();
+            triggerIncomingCall(displayName, audioFilePath, attachedImageBase64);
           }, delay);
         }
 
@@ -863,43 +841,41 @@
       }
     }
 
-    // リアルタイム受信監視
+    // リアルタイム受信監視（DBフィールド名 recipientId で検索）
     function listenForIncomingCapsules() {
       if (!db || !myOurieID) return;
+
       try {
         db.collection('capsules')
-          .where('recipientID', '==', myOurieID)
+          .where('recipientId', '==', myOurieID)
           .onSnapshot((snapshot) => {
             snapshot.docChanges().forEach((change) => {
               if (change.type === 'added') {
                 const data = change.doc.data();
-                const delay = data.targetTime - Date.now();
+                
+                const delay = data.targetTimestamp - Date.now();
                 if (delay > 0) {
                   setTimeout(() => {
-                    currentActiveCapsule = data;
-                    triggerIncomingCall();
+                    triggerIncomingCall(data.senderName, data.audioUrl, data.photoData);
                   }, delay);
                 } else {
-                  currentActiveCapsule = data;
-                  triggerIncomingCall();
+                  triggerIncomingCall(data.senderName, data.audioUrl, data.photoData);
                 }
               }
             });
-          });
-      } catch(e) { console.error("Snapshot Error:", e); }
+          }, (err) => console.error("Snapshot Error:", err));
+      } catch(e) { console.error("Listen Error:", e); }
     }
 
-    function triggerIncomingCall() {
-      if (!currentActiveCapsule) {
-        currentActiveCapsule = {
-          id: "capsule_" + Date.now(),
-          senderName: "過去の自分",
-          audioPath: audioFilePath,
-          image: attachedImageBase64,
-          date: new Date().toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-          replies: []
-        };
-      }
+    function triggerIncomingCall(senderName, audioUrl, photoData) {
+      currentActiveCapsule = {
+        id: "capsule_" + Date.now(),
+        senderName: senderName || "過去の自分",
+        audioPath: audioUrl || audioFilePath,
+        image: photoData || attachedImageBase64,
+        date: new Date().toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        replies: []
+      };
 
       document.getElementById('incoming-name').innerText = currentActiveCapsule.senderName;
       const imgContainer = document.getElementById('incoming-attached-image-container');
@@ -942,7 +918,7 @@
         if (timerText) timerText.innerText = `${m}:${s}`;
       }, 1000);
 
-      playAudio(false);
+      playAudio(false, currentActiveCapsule ? currentActiveCapsule.audioPath : null);
 
       saveCapsuleToHistory(currentActiveCapsule);
       document.getElementById('nav-badge').classList.remove('hidden');
@@ -959,7 +935,8 @@
         try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} 
       }
 
-      if (attachedImageBase64 && attachedImageBase64 !== "" && !imageAlreadyShown) {
+      const img = currentActiveCapsule ? currentActiveCapsule.image : attachedImageBase64;
+      if (img && img !== "" && !imageAlreadyShown) {
         showAttachedImageAfterAudio();
         saveCapsuleToHistory(currentActiveCapsule);
         return;
@@ -984,12 +961,13 @@
     }
 
     function showAttachedImageAfterAudio() {
-      if (attachedImageBase64 && attachedImageBase64 !== "" && !imageAlreadyShown) {
+      const imgData = currentActiveCapsule ? currentActiveCapsule.image : attachedImageBase64;
+      if (imgData && imgData !== "" && !imageAlreadyShown) {
         imageAlreadyShown = true;
         const img = document.getElementById('incoming-attached-image');
         const container = document.getElementById('incoming-attached-image-container');
         if (img && container) {
-          img.src = attachedImageBase64;
+          img.src = imgData;
           container.classList.remove('hidden');
           
           setTimeout(() => {
@@ -1000,9 +978,9 @@
     }
 
     function playAudio(forceSpeaker, customPath = null) {
-      const targetPath = customPath || audioFilePath;
-      
-      // HTML5 Audio 再生 (Webブラウザ用 & data:URI)
+      const targetPath = customPath || (currentActiveCapsule ? currentActiveCapsule.audioPath : audioFilePath);
+      if (!targetPath) return;
+
       if (targetPath.startsWith("data:") || targetPath.startsWith("http")) {
         const audio = new Audio(targetPath);
         audio.play().catch(e => console.error(e));
