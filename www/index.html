@@ -355,6 +355,8 @@
 
   <script>
     let db = null;
+    let snapshotUnsubscribe = null;
+
     try {
       if (typeof firebase !== 'undefined' && !firebase.apps.length) {
         const firebaseConfig = {
@@ -787,7 +789,7 @@
       if (container) container.classList.add('hidden');
     }
 
-    // カプセル予約・送信処理（DBフィールド名完全一致版）
+    // 連続送信対応の予約処理
     async function scheduleCapsule() {
       try {
         const inputVal = document.getElementById('target-time-input').value;
@@ -808,7 +810,6 @@
           displayName = customSenderName ? customSenderName : masterMyName;
         }
 
-        // Firestore の既存構造 (recipientId, targetTimestamp, audioUrl, photoData 等) に完全統一
         const capsuleData = {
           senderId: myOurieID,
           senderName: displayName,
@@ -823,7 +824,6 @@
         if (db) {
           try {
             await db.collection('capsules').add(capsuleData);
-            console.log("Firestoreへの保存成功!");
           } catch(e) { console.error("Firestore Save Error:", e); }
         }
 
@@ -835,18 +835,30 @@
 
         alert(`タイムカプセルを送信・予約しました！ (送信先: ${recipientUserName || targetRecipientID})`);
 
+        // 送信後に状態をリセットして次の連続送信を可能に
+        audioFilePath = "";
+        attachedImageBase64 = "";
+        removeAttachedImage();
+        document.getElementById('preview-area').classList.add('hidden');
+        document.getElementById('recording-timer').innerText = "00:00";
+        setTimeOffset(60);
+
       } catch (err) {
         console.error("Schedule Error:", err);
         alert("予約処理中にエラーが発生しました: " + err.message);
       }
     }
 
-    // リアルタイム受信監視（DBフィールド名 recipientId で検索）
+    // 連続着信に対応したリアルタイム監視
     function listenForIncomingCapsules() {
       if (!db || !myOurieID) return;
 
+      if (snapshotUnsubscribe) {
+        snapshotUnsubscribe();
+      }
+
       try {
-        db.collection('capsules')
+        snapshotUnsubscribe = db.collection('capsules')
           .where('recipientId', '==', myOurieID)
           .onSnapshot((snapshot) => {
             snapshot.docChanges().forEach((change) => {
@@ -945,8 +957,11 @@
       closeIncomingModal();
     }
 
+    // モーダルを閉じるときに完全初期化（次の連続着信を受け入れ可能にする）
     function closeIncomingModal() {
       imageAlreadyShown = false;
+      currentActiveCapsule = null;
+
       const modal = document.getElementById('incoming-modal');
       const actions = document.getElementById('incoming-actions');
       const inCallActions = document.getElementById('in-call-actions');
