@@ -81,7 +81,7 @@
         </button>
       </div>
 
-      <!-- 友達指定エリア（削除ボタン付き） -->
+      <!-- 友達指定エリア -->
       <div id="friend-select-area" class="hidden space-y-2.5 pt-1 border-t border-slate-800/80">
         <div id="friend-dropdown-container">
           <label class="text-[10px] text-slate-400 font-medium mb-1 block">交換済みの友達から選ぶ</label>
@@ -351,7 +351,7 @@
         <span>返信ボイスを保存・送信</span>
       </button>
     </div>
-  </main>
+  </div>
 
   <script>
     // 本物の Firebase 設定を適用
@@ -713,7 +713,6 @@
             nativeRecorder = new Media(audioFilePath, () => {}, (err) => console.error(err));
             nativeRecorder.startRecord();
           } else if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            // PCブラウザ用Webマイク処理
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             audioChunks = [];
             webMediaRecorder = new MediaRecorder(stream);
@@ -790,7 +789,7 @@
       if (container) container.classList.add('hidden');
     }
 
-    // オンライン送信処理
+    // カプセル予約・送信処理（ローカル＆オンライン着信を両保証）
     async function scheduleCapsule() {
       try {
         const inputVal = document.getElementById('target-time-input').value;
@@ -823,16 +822,17 @@
           replies: []
         };
 
-        // Firebase Firestore へ保存（オンライン同期）
+        // Firebase Firestore へ送信保存
         if (db) {
           try {
             await db.collection('capsules').add({
               ...currentActiveCapsule,
               createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-          } catch(e) { console.error("Firestore Error:", e); }
+          } catch(e) { console.error("Firestore Save Error:", e); }
         }
 
+        // Capacitor ローカル通知
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
           const { LocalNotifications } = window.Capacitor.Plugins;
           try {
@@ -849,12 +849,12 @@
           } catch(e) {}
         }
 
-        // 自分宛てテストの場合のみローカルタイマー起動
-        if (targetRecipientID === myOurieID) {
-          setTimeout(() => { triggerIncomingCall(); }, delay);
-        }
+        // どんな状況でも指定時間に着信画面を立ち上げる確実なローカルタイマー
+        setTimeout(() => {
+          triggerIncomingCall();
+        }, delay);
 
-        alert(`タイムカプセルをオンライン送信・予約しました！ (送信先: ${recipientUserName || targetRecipientID})`);
+        alert(`タイムカプセルを送信・予約しました！ (送信先: ${recipientUserName || targetRecipientID})`);
 
       } catch (err) {
         console.error("Schedule Error:", err);
