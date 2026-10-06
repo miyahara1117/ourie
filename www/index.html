@@ -789,7 +789,7 @@
       if (container) container.classList.add('hidden');
     }
 
-    // カプセル予約・送信処理（ローカル＆オンライン着信を両保証）
+    // オンライン/ローカル送信切り替え処理
     async function scheduleCapsule() {
       try {
         const inputVal = document.getElementById('target-time-input').value;
@@ -832,27 +832,28 @@
           } catch(e) { console.error("Firestore Save Error:", e); }
         }
 
-        // Capacitor ローカル通知
-        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
-          const { LocalNotifications } = window.Capacitor.Plugins;
-          try {
-            await LocalNotifications.schedule({
-              notifications: [
-                {
-                  title: "タイムカプセルが届きました",
-                  body: `${displayName} から着信メッセージがあります`,
-                  id: Math.floor(Math.random() * 100000),
-                  schedule: { at: new Date(targetTime) }
-                }
-              ]
-            });
-          } catch(e) {}
-        }
+        // 自分宛ての場合のみ自分の端末でローカルタイマーを回す
+        if (targetRecipientID === myOurieID) {
+          if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+            const { LocalNotifications } = window.Capacitor.Plugins;
+            try {
+              await LocalNotifications.schedule({
+                notifications: [
+                  {
+                    title: "タイムカプセルが届きました",
+                    body: `${displayName} から着信メッセージがあります`,
+                    id: Math.floor(Math.random() * 100000),
+                    schedule: { at: new Date(targetTime) }
+                  }
+                ]
+              });
+            } catch(e) {}
+          }
 
-        // どんな状況でも指定時間に着信画面を立ち上げる確実なローカルタイマー
-        setTimeout(() => {
-          triggerIncomingCall();
-        }, delay);
+          setTimeout(() => {
+            triggerIncomingCall();
+          }, delay);
+        }
 
         alert(`タイムカプセルを送信・予約しました！ (送信先: ${recipientUserName || targetRecipientID})`);
 
