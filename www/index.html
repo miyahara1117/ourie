@@ -929,7 +929,6 @@
       
       if (imgContainer) {
         imgContainer.classList.add('hidden');
-        imgContainer.className = "hidden mt-4 rounded-2xl overflow-hidden border border-purple-500/40 shadow-2xl bg-slate-900 max-h-64 flex items-center justify-center transition-all duration-700 opacity-0 scale-95";
       }
 
       if (timerText) {
@@ -946,7 +945,10 @@
         if (timerText) timerText.innerText = `${m}:${s}`;
       }, 1000);
 
-      playAudio(false, currentActiveCapsule ? currentActiveCapsule.audioPath : null);
+      // ★ ボタンを押したこのタイミングで音声を確実に再生
+      if (currentActiveCapsule && currentActiveCapsule.audioPath) {
+        playAudio(false, currentActiveCapsule.audioPath);
+      }
 
       saveCapsuleToHistory(currentActiveCapsule);
       document.getElementById('nav-badge').classList.remove('hidden');
@@ -1009,14 +1011,24 @@
 
     function playAudio(forceSpeaker, customPath = null) {
       const targetPath = customPath || (currentActiveCapsule ? currentActiveCapsule.audioPath : audioFilePath);
-      if (!targetPath) return;
-
-      if (targetPath.startsWith("data:") || targetPath.startsWith("http")) {
-        const audio = new Audio(targetPath);
-        audio.play().catch(e => console.error(e));
+      if (!targetPath) {
+        console.warn("再生する音声データが見つかりません");
         return;
       }
 
+      // Web環境 (Base64データまたはHTTP URL)
+      if (targetPath.startsWith("data:") || targetPath.startsWith("http") || targetPath.startsWith("blob:")) {
+        const audio = new Audio(targetPath);
+        audio.play().then(() => {
+          console.log("音声再生開始に成功しました");
+        }).catch(e => {
+          console.error("音声の再生がブラウザにブロックされたか失敗しました:", e);
+          alert("音声の再生に失敗しました。端末の音量設定やマナーモードを確認してください。");
+        });
+        return;
+      }
+
+      // スマホアプリ（Capacitor/Cordova）環境
       if (nativePlayer) { 
         try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} 
       }
@@ -1032,7 +1044,7 @@
           () => {
             if (toggle && typeof toggle.setAudioMode === 'function') toggle.setAudioMode("speaker");
           },
-          (err) => console.error(err)
+          (err) => console.error("Native Media Error:", err)
         );
         nativePlayer.play();
       }
