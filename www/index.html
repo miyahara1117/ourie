@@ -351,12 +351,12 @@
         <span>返信ボイスを保存・送信</span>
       </button>
     </div>
-  </main>
+  </div>
 
   <script>
     let db = null;
     let snapshotUnsubscribe = null;
-    let appStartTime = Date.now(); // 起動時刻を記憶
+    let isInitialLoad = true;
 
     try {
       if (typeof firebase !== 'undefined' && !firebase.apps.length) {
@@ -848,13 +848,15 @@
       }
     }
 
-    // 起動時の過去着信自動立ち上がり防止付きリアルタイム監視
+    // リアルタイム受信監視（初回ロード判定を安定化）
     function listenForIncomingCapsules() {
       if (!db || !myOurieID) return;
 
       if (snapshotUnsubscribe) {
         snapshotUnsubscribe();
       }
+
+      isInitialLoad = true;
 
       try {
         snapshotUnsubscribe = db.collection('capsules')
@@ -863,22 +865,10 @@
             snapshot.docChanges().forEach((change) => {
               if (change.type === 'added') {
                 const data = change.doc.data();
-                
-                // Firestoreのタイムスタンプまたは現在時刻との比較
-                const createdTime = data.createdAt ? data.createdAt.toMillis() : Date.now();
                 const delay = data.targetTimestamp - Date.now();
 
-                // アプリ起動より後に送信されたデータ、または指定日時がまだ未来のデータのみ着信を起こす
-                if (createdTime >= (appStartTime - 5000) || delay > 0) {
-                  if (delay > 0) {
-                    setTimeout(() => {
-                      triggerIncomingCall(data.senderName, data.audioUrl, data.photoData);
-                    }, delay);
-                  } else {
-                    triggerIncomingCall(data.senderName, data.audioUrl, data.photoData);
-                  }
-                } else {
-                  // アプリ起動前の過去データは履歴としてのみ読み込み
+                // 初回読み込み時に過去データは全て履歴保存のみ行い着信は鳴らさない
+                if (isInitialLoad && delay <= 0) {
                   saveCapsuleToHistory({
                     id: change.doc.id,
                     senderName: data.senderName,
@@ -887,9 +877,20 @@
                     date: new Date(data.targetTimestamp).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
                     replies: []
                   });
+                } else {
+                  // アプリ起動後に新しく送信されたもの、またはまだ指定時刻になっていないものはタイマー着信
+                  if (delay > 0) {
+                    setTimeout(() => {
+                      triggerIncomingCall(data.senderName, data.audioUrl, data.photoData);
+                    }, delay);
+                  } else {
+                    triggerIncomingCall(data.senderName, data.audioUrl, data.photoData);
+                  }
                 }
               }
             });
+
+            isInitialLoad = false;
           }, (err) => console.error("Snapshot Error:", err));
       } catch(e) { console.error("Listen Error:", e); }
     }
