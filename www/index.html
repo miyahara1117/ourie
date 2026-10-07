@@ -827,12 +827,6 @@
           } catch(e) { console.error("Firestore Save Error:", e); }
         }
 
-        if (targetRecipientID === myOurieID) {
-          setTimeout(() => {
-            triggerIncomingCall(displayName, audioFilePath, attachedImageBase64);
-          }, delay);
-        }
-
         alert(`タイムカプセルを送信・予約しました！ (送信先: ${recipientUserName || targetRecipientID})`);
 
         audioFilePath = "";
@@ -848,15 +842,13 @@
       }
     }
 
-    // リアルタイム受信監視（初回ロード判定を安定化）
+    // リアルタイム受信監視
     function listenForIncomingCapsules() {
       if (!db || !myOurieID) return;
 
       if (snapshotUnsubscribe) {
         snapshotUnsubscribe();
       }
-
-      isInitialLoad = true;
 
       try {
         snapshotUnsubscribe = db.collection('capsules')
@@ -867,30 +859,26 @@
                 const data = change.doc.data();
                 const delay = data.targetTimestamp - Date.now();
 
-                // 初回読み込み時に過去データは全て履歴保存のみ行い着信は鳴らさない
-                if (isInitialLoad && delay <= 0) {
-                  saveCapsuleToHistory({
-                    id: change.doc.id,
-                    senderName: data.senderName,
-                    audioPath: data.audioUrl,
-                    image: data.photoData,
-                    date: new Date(data.targetTimestamp).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                    replies: []
-                  });
-                } else {
-                  // アプリ起動後に新しく送信されたもの、またはまだ指定時刻になっていないものはタイマー着信
-                  if (delay > 0) {
-                    setTimeout(() => {
-                      triggerIncomingCall(data.senderName, data.audioUrl, data.photoData);
-                    }, delay);
-                  } else {
+                // 履歴に保存
+                saveCapsuleToHistory({
+                  id: change.doc.id,
+                  senderName: data.senderName,
+                  audioPath: data.audioUrl,
+                  image: data.photoData,
+                  date: new Date(data.targetTimestamp).toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                  replies: []
+                });
+
+                // 指定時刻に合わせて着信呼び出し
+                if (delay > 0) {
+                  setTimeout(() => {
                     triggerIncomingCall(data.senderName, data.audioUrl, data.photoData);
-                  }
+                  }, delay);
+                } else {
+                  triggerIncomingCall(data.senderName, data.audioUrl, data.photoData);
                 }
               }
             });
-
-            isInitialLoad = false;
           }, (err) => console.error("Snapshot Error:", err));
       } catch(e) { console.error("Listen Error:", e); }
     }
@@ -899,8 +887,8 @@
       currentActiveCapsule = {
         id: "capsule_" + Date.now(),
         senderName: senderName || "過去の自分",
-        audioPath: audioUrl || audioFilePath,
-        image: photoData || attachedImageBase64,
+        audioPath: audioUrl || "",
+        image: photoData || "",
         date: new Date().toLocaleString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
         replies: []
       };
@@ -945,7 +933,7 @@
         if (timerText) timerText.innerText = `${m}:${s}`;
       }, 1000);
 
-      // ★ ボタンを押したこのタイミングで音声を確実に再生
+      // ★ 緑ボタンを押した直後に確実に音声を再生
       if (currentActiveCapsule && currentActiveCapsule.audioPath) {
         playAudio(false, currentActiveCapsule.audioPath);
       }
@@ -965,7 +953,7 @@
         try { nativePlayer.stop(); nativePlayer.release(); } catch(e) {} 
       }
 
-      const img = currentActiveCapsule ? currentActiveCapsule.image : attachedImageBase64;
+      const img = currentActiveCapsule ? currentActiveCapsule.image : "";
       if (img && img !== "" && !imageAlreadyShown) {
         showAttachedImageAfterAudio();
         saveCapsuleToHistory(currentActiveCapsule);
@@ -993,7 +981,7 @@
     }
 
     function showAttachedImageAfterAudio() {
-      const imgData = currentActiveCapsule ? currentActiveCapsule.image : attachedImageBase64;
+      const imgData = currentActiveCapsule ? currentActiveCapsule.image : "";
       if (imgData && imgData !== "" && !imageAlreadyShown) {
         imageAlreadyShown = true;
         const img = document.getElementById('incoming-attached-image');
@@ -1022,8 +1010,7 @@
         audio.play().then(() => {
           console.log("音声再生開始に成功しました");
         }).catch(e => {
-          console.error("音声の再生がブラウザにブロックされたか失敗しました:", e);
-          alert("音声の再生に失敗しました。端末の音量設定やマナーモードを確認してください。");
+          console.error("音声の再生失敗:", e);
         });
         return;
       }
