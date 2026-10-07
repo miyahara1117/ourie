@@ -1141,6 +1141,7 @@
         imgContainer.classList.add('hidden');
       }
 
+      // 受話器（耳あて）とスピーカーの切り替えボタン
       document.getElementById('detail-play-earpiece-btn').onclick = () => playAudio(false, item.audioPath);
       document.getElementById('detail-play-speaker-btn').onclick = () => playAudio(true, item.audioPath);
 
@@ -1155,7 +1156,7 @@
               <i class="fa-solid fa-microphone text-[10px]"></i>
               <span>返信ボイス #${idx + 1} (${rep.date})</span>
             </span>
-            <button onclick="playAudio(true, '${rep.audio}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs text-purple-300 rounded-md font-medium">聴く</button>
+            <button onclick="playAudio(false, '${rep.audio}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs text-purple-300 rounded-md font-medium">聴く</button>
           `;
           replyList.appendChild(repDiv);
         });
