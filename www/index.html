@@ -356,7 +356,7 @@
   <script>
     let db = null;
     let snapshotUnsubscribe = null;
-    let isInitialLoad = true;
+    let isInitialLoad = true; // 初回読み込み制御用
 
     try {
       if (typeof firebase !== 'undefined' && !firebase.apps.length) {
@@ -850,6 +850,8 @@
         snapshotUnsubscribe();
       }
 
+      isInitialLoad = true;
+
       try {
         snapshotUnsubscribe = db.collection('capsules')
           .where('recipientId', '==', myOurieID)
@@ -859,7 +861,7 @@
                 const data = change.doc.data();
                 const delay = data.targetTimestamp - Date.now();
 
-                // 履歴に保存
+                // 履歴保存処理
                 saveCapsuleToHistory({
                   id: change.doc.id,
                   senderName: data.senderName,
@@ -869,7 +871,12 @@
                   replies: []
                 });
 
-                // 指定時刻に合わせて着信呼び出し
+                // アプリ起動時の過去データ読み込み時は着信画面を開かない
+                if (isInitialLoad && delay <= 0) {
+                  return;
+                }
+
+                // 新しく送られてきたデータのみ着信処理を実行
                 if (delay > 0) {
                   setTimeout(() => {
                     triggerIncomingCall(data.senderName, data.audioUrl, data.photoData);
@@ -879,6 +886,9 @@
                 }
               }
             });
+
+            // 初回読み込み完了フラグを下ろす
+            isInitialLoad = false;
           }, (err) => console.error("Snapshot Error:", err));
       } catch(e) { console.error("Listen Error:", e); }
     }
@@ -933,7 +943,7 @@
         if (timerText) timerText.innerText = `${m}:${s}`;
       }, 1000);
 
-      // ★ 緑ボタンを押した直後に確実に音声を再生
+      // 緑ボタンを押した直後に確実に音声を再生
       if (currentActiveCapsule && currentActiveCapsule.audioPath) {
         playAudio(false, currentActiveCapsule.audioPath);
       }
